@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/Button';
@@ -42,8 +42,12 @@ export default function Login() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>Agrarium</Text>
-        <Text style={styles.tagline}>Inteligência agronômica · custos da cana</Text>
+        <Image
+          source={require('../../assets/images/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="Agrarium"
+        />
 
         <Controller
           control={control}
@@ -77,8 +81,7 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   container: { padding: 24, paddingTop: 48, maxWidth: 480, width: '100%', alignSelf: 'center', flexGrow: 1 },
-  brand: { fontSize: 34, fontWeight: '800', color: colors.primary, textAlign: 'center' },
-  tagline: { fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 32 },
+  logo: { width: 220, height: 124, alignSelf: 'center', marginBottom: 32 },
   err: { color: colors.danger, marginBottom: 12 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   muted: { color: colors.muted },
