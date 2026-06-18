@@ -2,57 +2,63 @@
 
 @AGENTS.md
 
-App do Agrarium para produtores de cana. Um codebase → **iOS, Android e web** (Expo Router
-+ React Native Web). Consome a API Rails em `../agrarium-backend`.
+Agrarium app for sugarcane producers. One codebase → **iOS, Android and web** (Expo Router
++ React Native Web). Consumes the Rails API in `../agrarium-backend`.
 
-**Estágio atual: só login/cadastro + tela de boas-vindas.** O fluxo de lançamento de safra
-e os indicadores de custo serão desenhados depois (o custo do produtor é **detalhado**, e o
-modelo ainda será definido). Princípio: frontend "burro", regra de negócio no backend.
+**Current stage: login/sign up + a welcome screen only.** The harvest-input flow and the
+cost indicators will be designed later (the producer's cost is **detailed**, and the model
+is still to be defined). Principle: dumb frontend, business logic lives in the backend.
 
-> Contexto de produto em `../app.md` e `../knowledge.md` (raiz do repo pai).
+> Product context lives in `../app.md` and `../knowledge.md` (root of the parent repo).
 
 ## Stack
-- Expo SDK 56 · Expo Router (typed routes) · TypeScript · estrutura em `src/`.
+- Expo SDK 56 · Expo Router (typed routes) · TypeScript · `src/` layout.
 - **React Query** · **axios** · **react-hook-form + zod** · **expo-secure-store**.
-- UI com **StyleSheet** + tema verde Agrarium (NativeWind é melhoria futura).
+- UI with **StyleSheet** + a green Agrarium theme (NativeWind is a future enhancement).
 
-## Comandos
+## Commands
 ```bash
-npx expo start                    # tecla w=web, i=iOS, a=Android
+npx expo start --web              # run on web (no Expo Go needed) — current dev path
+npx expo start                    # Metro: press w=web, i=iOS, a=Android
 npx tsc --noEmit                  # type-check
-npx expo export --platform web    # bundle de validação
+npx expo export --platform web    # production-ish bundle (validation)
 ```
+Run the backend too so the app has an API: `cd ../agrarium-backend && bin/rails s` (port 3000).
+Demo login: `demo@agrarium.com.br` / `agrarium123`.
 
-## Estrutura (atual)
+## Structure (current)
 ```
 src/
 ├─ app/
 │  ├─ _layout.tsx          # providers: QueryClient + AuthProvider + Stack
-│  ├─ index.tsx            # redirect: logado → /dashboard, senão → /login
-│  ├─ login.tsx            # login (mostra a logo)
-│  ├─ register.tsx         # cadastro
+│  ├─ index.tsx            # redirect: signed in → /dashboard, else → /login
+│  ├─ login.tsx            # login (shows the logo)
+│  ├─ register.tsx         # sign up
 │  └─ (app)/
-│     ├─ _layout.tsx       # grupo protegido (guarda por auth)
-│     └─ dashboard.tsx     # só "bem-vindo" por enquanto
+│     ├─ _layout.tsx       # protected group (auth guard)
+│     └─ dashboard.tsx     # welcome-only for now
 ├─ lib/
-│  ├─ api.ts               # axios + interceptor de Bearer token (EXPO_PUBLIC_API_URL)
-│  ├─ auth.tsx             # AuthContext (signIn/signUp/signOut, /me no boot)
-│  ├─ storage.ts           # token cross-platform: SecureStore (nativo) / localStorage (web)
-│  └─ theme.ts             # cores Agrarium + helpers
+│  ├─ api.ts               # axios + Bearer-token interceptor (EXPO_PUBLIC_API_URL)
+│  ├─ auth.tsx             # AuthContext (signIn/signUp/signOut, /me on boot)
+│  ├─ storage.ts           # cross-platform token: SecureStore (native) / localStorage (web)
+│  └─ theme.ts             # Agrarium colors + helpers
 ├─ components/ui/          # Button, Field, Card
-└─ assets/images/logo.png  # logo Agrarium (usada no login)
+└─ assets/images/logo.png  # Agrarium logo (used on login)
 ```
 
-## Config de ambiente
+## Environment
 - `EXPO_PUBLIC_API_URL` (`.env`). Fallback: `http://localhost:3000/api/v1`.
-- Em device físico, usar o IP da LAN: `EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api/v1`.
+- On a physical device, use the machine's LAN IP: `EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api/v1`.
 
-## Convenções / pegadinhas
-- **Conferir docs versionados do Expo antes de escrever código** (ver `AGENTS.md`).
-- Tudo deve rodar em **web + nativo**: `expo-secure-store` não roda no web → usar
-  `lib/storage.ts`. Evitar `Alert.alert` (usar estado de erro na tela).
-- Rotas de grupo `(app)` não aparecem na URL: navegar para `/dashboard`, `/login`, etc.
+## Conventions / gotchas
+- **Check the versioned Expo docs before writing Expo code** (see `AGENTS.md`).
+- Everything must run on **web + native**: `expo-secure-store` doesn't work on web → use
+  `lib/storage.ts`. Avoid `Alert.alert` (use on-screen error state instead).
+- Route groups `(app)` don't appear in the URL: navigate to `/dashboard`, `/login`, etc.
+- **Expo Go vs SDK**: this project is on a very new SDK; Expo Go on the store may not match
+  it ("requires a newer version of Expo Go"). For device testing use a **development build**
+  (`npx expo run:ios` / `run:android`), not Expo Go. Web is unaffected.
 
-## Próximo passo (amanhã)
-Desenhar, com o agrônomo, o modelo de **custo detalhado** da safra e só então criar as telas
-de lançamento e de resultado. Ver `../questions.md`.
+## Next step (tomorrow)
+Design the **detailed cost model** for a harvest with the agronomist, then build the
+input and result screens. See `../questions.md`.
