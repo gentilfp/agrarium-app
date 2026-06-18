@@ -69,8 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    await clearToken();
-    setUser(null);
+    // Always sign out locally, even if wiping the stored token throws
+    // (SecureStore can reject on native; localStorage never does on web).
+    try {
+      await clearToken();
+    } finally {
+      setUser(null);
+    }
   }
 
   return (

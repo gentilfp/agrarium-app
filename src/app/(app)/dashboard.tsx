@@ -13,7 +13,7 @@ export default function Dashboard() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={() => signOut()} hitSlop={8}>
+            <Pressable onPress={signOut} hitSlop={12} style={styles.headerBtn}>
               <Text style={styles.headerAction}>Sair</Text>
             </Pressable>
           ),
@@ -41,5 +41,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '800', color: colors.text, textAlign: 'center' },
   sub: { fontSize: 15, color: colors.muted, textAlign: 'center', marginTop: 10, lineHeight: 21 },
   btn: { marginTop: 28, alignSelf: 'stretch' },
-  headerAction: { color: colors.white, fontWeight: '700', marginRight: 4 },
+  headerBtn: { paddingVertical: 6, paddingHorizontal: 10, marginRight: 4, alignItems: 'center', justifyContent: 'center' },
+  headerAction: { color: colors.white, fontSize: 16, fontWeight: '600' },
 });
