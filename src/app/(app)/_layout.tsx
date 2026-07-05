@@ -18,6 +18,8 @@ export default function AppLayout() {
         contentStyle: { backgroundColor: colors.bg },
       }}>
       <Stack.Screen name="dashboard" options={{ title: 'Agrarium' }} />
+      <Stack.Screen name="nova-safra" options={{ title: 'Nova safra' }} />
+      <Stack.Screen name="resultado" options={{ title: 'Relatório' }} />
     </Stack>
   );
 }
