@@ -3,29 +3,26 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BarRow } from '@/components/BarRow';
+import { CHART_COLORS, CompareBars, StackedBar } from '@/components/CostChart';
 import { MetricCard } from '@/components/MetricCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import {
   BENCHMARK,
   benchCustoKgAtr,
-  categoryLabel,
+  compareStatus,
   CONTRATO_TIPOS,
   itemAmount,
+  itemLabel,
+  itemNote,
   MODALIDADES,
+  SURVEY_REFERENCE,
 } from '@/lib/harvest';
 import { useHarvest } from '@/lib/harvest-store';
-import { brl, colors, statusColor, statusLabel, type Status } from '@/lib/theme';
+import { brl, colors, statusColor, type Status } from '@/lib/theme';
 
 const num = (x: number, d = 0) =>
   x.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
-
-// Cor de comparação vs benchmark.
-function cmp(value: number, bench: number, lowerIsBetter: boolean): Status {
-  const ratio = bench > 0 ? value / bench : 1;
-  if (lowerIsBetter) return ratio <= 1 ? 'bom' : ratio <= 1.15 ? 'atencao' : 'critico';
-  return ratio >= 1 ? 'bom' : ratio >= 0.85 ? 'atencao' : 'critico';
-}
 
 function BenchRow({
   label,
@@ -72,6 +69,13 @@ export default function Resultado() {
   const modalidade = MODALIDADES.find((m) => m.key === r.input.modalidade)?.label ?? '—';
   const margemColor = r.margem >= 0 ? colors.good : colors.danger;
 
+  const segments = r.breakdown.map((b, i) => ({
+    label: b.label,
+    value: brl(b.total, 0),
+    pct: b.pct,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.mockTag}>Estimativa · protótipo</Text>
@@ -90,7 +94,7 @@ export default function Resultado() {
       {/* Indicador-chave */}
       <Card style={styles.heroCard}>
         <Text style={styles.heroLabel}>Custo por kg de ATR</Text>
-        <Text style={[styles.hero, { color: statusColor(cmp(r.custoKgAtr, benchCustoKgAtr, true)) }]}>
+        <Text style={[styles.hero, { color: statusColor(compareStatus(r.custoKgAtr, benchCustoKgAtr, true)) }]}>
           {brl(r.custoKgAtr, 4)}
         </Text>
         <Text style={styles.heroSub}>
@@ -103,22 +107,8 @@ export default function Resultado() {
         <MetricCard label="Custo / ha" value={brl(r.custoHa)} />
       </View>
 
-      {/* Score + resultado financeiro */}
+      {/* Resultado financeiro (sem classificação — comparamos com a base) */}
       <Card>
-        <View style={styles.scoreRow}>
-          <View style={[styles.scoreBadge, { backgroundColor: statusColor(r.status) }]}>
-            <Text style={styles.scoreNum}>{r.score}</Text>
-            <Text style={styles.scoreMax}>/100</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.scoreStatus, { color: statusColor(r.status) }]}>
-              {statusLabel(r.status)}
-            </Text>
-            <Text style={styles.scoreHint}>
-              Nota do canavial (eficiência de custo, produtividade e margem).
-            </Text>
-          </View>
-        </View>
         <View style={styles.finRow}>
           <View style={styles.finCell}>
             <Text style={styles.finLabel}>Receita</Text>
@@ -133,6 +123,31 @@ export default function Resultado() {
             <Text style={styles.finValue}>{num(r.breakEvenTch, 1)} t/ha</Text>
           </View>
         </View>
+      </Card>
+
+      {/* Gráfico de composição do custo */}
+      <Text style={styles.h2}>Onde você está gastando</Text>
+      <Card>
+        <StackedBar segments={segments} />
+      </Card>
+
+      {/* Comparação com outros produtores (base Agrarium) */}
+      <Text style={styles.h2}>Como você se compara</Text>
+      <Card>
+        {r.surveyComparison.length > 0 ? (
+          <>
+            <Text style={styles.compareIntro}>
+              Seus insumos (R$/ha) vs. a referência da base — {SURVEY_REFERENCE.n} produtores,{' '}
+              {SURVEY_REFERENCE.region}.
+            </Text>
+            <CompareBars rows={r.surveyComparison} format={(n) => brl(n, 0)} />
+            <Text style={styles.sourceNote}>{SURVEY_REFERENCE.note}</Text>
+          </>
+        ) : (
+          <Text style={styles.compareIntro}>
+            Lance os insumos de tratos da soca (NPK, defensivos, herbicidas…) para comparar com a base.
+          </Text>
+        )}
       </Card>
 
       {/* Tabela itemizada (o "Excel") */}
@@ -151,7 +166,12 @@ export default function Resultado() {
               {rows.map((i) => (
                 <View key={i.id} style={styles.tableRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowDesc}>{i.description}</Text>
+                    <Text style={styles.rowDesc}>{itemLabel(i)}</Text>
+                    {itemNote(i) || i.applications || i.mode ? (
+                      <Text style={styles.rowMeta}>
+                        {[itemNote(i), i.applications, i.mode].filter(Boolean).join(' · ')}
+                      </Text>
+                    ) : null}
                     {i.quantity != null && i.unitPrice != null ? (
                       <Text style={styles.rowMeta}>
                         {num(i.quantity, 0)} {i.unit} × {brl(i.unitPrice)}
@@ -170,8 +190,7 @@ export default function Resultado() {
         </View>
       </Card>
 
-      {/* Decomposição em barras */}
-      <Text style={styles.h2}>Onde você está gastando</Text>
+      {/* Decomposição em barras (detalhe por bloco) */}
       <Card>
         {r.breakdown.map((b) => (
           <BarRow
@@ -184,17 +203,17 @@ export default function Resultado() {
         ))}
       </Card>
 
-      {/* Comparação com o mercado */}
-      <Text style={styles.h2}>Comparação com o mercado</Text>
+      {/* Comparação com o mercado (referência do setor) */}
+      <Text style={styles.h2}>Referência do setor</Text>
       <Card>
         <BenchRow label="Custo / t" value={brl(r.custoT)} ref={`${brl(BENCHMARK.custoT)}`}
-          status={cmp(r.custoT, BENCHMARK.custoT, true)} />
+          status={compareStatus(r.custoT, BENCHMARK.custoT, true)} />
         <BenchRow label="Custo / kg ATR" value={brl(r.custoKgAtr, 4)} ref={brl(benchCustoKgAtr, 4)}
-          status={cmp(r.custoKgAtr, benchCustoKgAtr, true)} />
+          status={compareStatus(r.custoKgAtr, benchCustoKgAtr, true)} />
         <BenchRow label="Produtividade" value={`${num(r.tch, 1)} t/ha`} ref={`${BENCHMARK.tch} t/ha`}
-          status={cmp(r.tch, BENCHMARK.tch, false)} />
+          status={compareStatus(r.tch, BENCHMARK.tch, false)} />
         <BenchRow label="Qualidade (ATR)" value={`${num(r.input.atr)} kg/t`} ref={`${BENCHMARK.atr} kg/t`}
-          status={cmp(r.input.atr, BENCHMARK.atr, false)} />
+          status={compareStatus(r.input.atr, BENCHMARK.atr, false)} />
       </Card>
 
       {/* Recomendações */}
@@ -224,8 +243,8 @@ export default function Resultado() {
             Margem = receita − custo total
           </Text>
           <Text style={styles.methodSource}>
-            Benchmarks: {BENCHMARK.source}. Os números de referência e os pesos do score são
-            estimativas e serão validados com o agrônomo.
+            Comparação por insumo: {SURVEY_REFERENCE.note} A referência do setor vem de {BENCHMARK.source}.
+            Números a validar com o agrônomo.
           </Text>
         </Card>
       ) : null}
@@ -263,25 +282,15 @@ const styles = StyleSheet.create({
 
   metricRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
 
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
-  scoreBadge: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  scoreNum: { fontSize: 28, fontWeight: '900', color: colors.white },
-  scoreMax: { fontSize: 12, fontWeight: '700', color: colors.white, opacity: 0.85, marginTop: 8 },
-  scoreStatus: { fontSize: 18, fontWeight: '800' },
-  scoreHint: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  finRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
+  finRow: { flexDirection: 'row' },
   finCell: { flex: 1 },
   finLabel: { fontSize: 12, color: colors.muted },
   finValue: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: 2 },
 
   h2: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 8, marginTop: 4 },
+
+  compareIntro: { fontSize: 13, color: colors.muted, marginBottom: 14, lineHeight: 18 },
+  sourceNote: { fontSize: 11, color: colors.muted, marginTop: 6, lineHeight: 16, fontStyle: 'italic' },
 
   group: { marginBottom: 6 },
   groupHead: {

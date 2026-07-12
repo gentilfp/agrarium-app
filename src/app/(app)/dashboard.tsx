@@ -4,8 +4,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useAuth } from '@/lib/auth';
+import { benchCustoKgAtr, compareStatus } from '@/lib/harvest';
 import { useHarvest } from '@/lib/harvest-store';
-import { brl, colors, statusColor, statusLabel } from '@/lib/theme';
+import { brl, colors, statusColor } from '@/lib/theme';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
@@ -42,13 +43,16 @@ export default function Dashboard() {
                 key={a.id}
                 onPress={() => router.push({ pathname: '/resultado', params: { id: a.id } })}>
                 <Card style={styles.rowCard}>
-                  <View style={[styles.scoreChip, { backgroundColor: statusColor(a.status) }]}>
-                    <Text style={styles.scoreChipText}>{a.score}</Text>
-                  </View>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: statusColor(compareStatus(a.custoKgAtr, benchCustoKgAtr, true)) },
+                    ]}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>Safra {a.input.safra}</Text>
                     <Text style={styles.rowMeta}>
-                      {statusLabel(a.status)} · {brl(a.custoKgAtr, 4)}/kg ATR · {brl(a.custoT)}/t
+                      {brl(a.custoKgAtr, 4)}/kg ATR · {brl(a.custoT)}/t
                     </Text>
                   </View>
                   <Text style={styles.chevron}>›</Text>
@@ -77,8 +81,7 @@ const styles = StyleSheet.create({
   cta: { marginTop: 20, marginBottom: 24 },
   h2: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 10 },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  scoreChip: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  scoreChipText: { color: colors.white, fontSize: 16, fontWeight: '800' },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
   rowTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   rowMeta: { fontSize: 13, color: colors.muted, marginTop: 2 },
   chevron: { fontSize: 26, color: colors.muted, fontWeight: '700' },

@@ -20,6 +20,98 @@ export const CATEGORIES: { key: CategoryKey; label: string; hint: string }[] = [
 
 export const categoryLabel = (k: CategoryKey) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
 
+// ── Subcategorias (dropdown do wizard) ────────────────────────────────────────
+// Menos texto livre: o produtor escolhe a subcategoria numa lista fechada, para
+// conseguirmos AGRUPAR e comparar depois (base Agrarium). A taxonomia dos tratos
+// da soca vem direto do questionário "Custos Cana Soca" (jun–jul/2026).
+//
+// - `refHa`  : referência R$/ha da base (mediana do questionário, apenas insumo).
+// - `modes`  : modalidades de aplicação (dropdown) quando fizer sentido.
+// - `applications`: pede o nº de aplicações (dropdown).
+export type Subcategory = {
+  key: string;
+  label: string;
+  refHa?: number;
+  applications?: boolean;
+  modes?: string[];
+};
+
+// Modalidades reaproveitadas entre insumos.
+const MODOS_TERRESTRE_AEREO = ['Terrestre - barra total', 'Aérea - avião', 'Aérea - drone'];
+const MODOS_CIGARRINHA = [
+  'Terrestre - barra total',
+  'Terrestre - 70/30',
+  'Terrestre - drench',
+  'Terrestre - corte de soqueira',
+  'Terrestre - vinhaça localizada',
+  'Aérea - avião',
+  'Aérea - drone',
+];
+const MODOS_SPHENOPHORUS = [
+  'Terrestre - drench',
+  'Terrestre - corte de soqueira',
+  'Terrestre - vinhaça localizada',
+];
+const MODOS_MATURACAO = ['Aéreo - avião', 'Aérea - drone', 'Não se aplica'];
+
+export const APLICACOES = ['1 aplicação', '2 aplicações', '3 aplicações', '+ de 3 aplicações'];
+
+export const SUBCATEGORIES: Record<CategoryKey, Subcategory[]> = {
+  formacao: [
+    { key: 'mudas', label: 'Mudas' },
+    { key: 'preparo_solo', label: 'Preparo de solo' },
+    { key: 'plantio', label: 'Plantio (operação)' },
+    { key: 'formacao_outros', label: 'Outros (formação)' },
+  ],
+  // Tratos da soca — insumos do questionário (R$/ha, apenas insumo) + operações.
+  tratos_soca: [
+    { key: 'npk', label: 'Fertilizante NPK', refHa: 1700 },
+    { key: 'calcario', label: 'Calcário', refHa: 300 },
+    { key: 'gesso', label: 'Gesso', refHa: 210 },
+    {
+      key: 'foliar',
+      label: 'Nutrição foliar / tecnologias complementares',
+      refHa: 190,
+      applications: true,
+      modes: MODOS_TERRESTRE_AEREO,
+    },
+    { key: 'broca', label: 'Inseticida — broca', refHa: 85, applications: true, modes: MODOS_TERRESTRE_AEREO },
+    { key: 'cigarrinha', label: 'Inseticida — cigarrinha', refHa: 150, applications: true, modes: MODOS_CIGARRINHA },
+    {
+      key: 'sphenophorus',
+      label: 'Inseticida — Sphenophorus levis',
+      refHa: 230,
+      applications: true,
+      modes: MODOS_SPHENOPHORUS,
+    },
+    { key: 'herbicida', label: 'Herbicida', refHa: 365, applications: true, modes: ['Terrestre - barra total', 'Aérea - drone'] },
+    { key: 'inibidor', label: 'Inibidor de florescimento', refHa: 34, modes: MODOS_MATURACAO },
+    { key: 'maturador', label: 'Maturador', refHa: 68, modes: MODOS_MATURACAO },
+    { key: 'tratos_aplicacao', label: 'Aplicação / adubação (operação)' },
+    { key: 'tratos_outros', label: 'Outros (tratos)' },
+  ],
+  colheita_cct: [
+    { key: 'corte', label: 'Corte' },
+    { key: 'transbordo', label: 'Transbordo / carregamento' },
+    { key: 'transporte', label: 'Transporte até a usina' },
+    { key: 'cct_outros', label: 'Outros (CCT)' },
+  ],
+  arrendamento: [{ key: 'arrend_terra', label: 'Arrendamento da terra' }],
+  outros: [
+    { key: 'mao_obra', label: 'Mão de obra' },
+    { key: 'conservacao', label: 'Conservação de estradas' },
+    { key: 'energia', label: 'Energia' },
+    { key: 'itr_seguro', label: 'ITR / seguros' },
+    { key: 'outros_diversos', label: 'Outros / diversos' },
+  ],
+};
+
+export const subcategoriesFor = (c: CategoryKey) => SUBCATEGORIES[c] ?? [];
+export const findSubcategory = (c: CategoryKey, key?: string) =>
+  key ? subcategoriesFor(c).find((s) => s.key === key) : undefined;
+export const subcategoryLabel = (c: CategoryKey, key?: string) =>
+  findSubcategory(c, key)?.label ?? '';
+
 export const UNITS = ['R$', 'kg', 'L', 't', 'ha', 'saco', 'hora', 'diária', 'un'] as const;
 export type Unit = (typeof UNITS)[number];
 
@@ -44,13 +136,29 @@ export const MODALIDADES: { key: Modalidade; label: string }[] = [
 // ── Item de custo discriminado (cada coisa que o produtor comprou) ────────────
 export type CostItem = {
   id: string;
-  description: string;
   category: CategoryKey;
+  subcategory?: string; // chave da lista fechada (dropdown) — usada para agrupar/comparar
+  description: string; // rótulo da subcategoria, ou uma observação livre opcional
+  applications?: string; // nº de aplicações (dropdown), quando aplicável
+  mode?: string; // modalidade de aplicação (dropdown), quando aplicável
   quantity?: number;
   unit?: Unit;
   unitPrice?: number;
   amount: number; // total em R$ (se houver quantity+unitPrice, é quantity×unitPrice)
 };
+
+// Nome de exibição do item: rótulo da subcategoria; a descrição livre vira detalhe.
+export function itemLabel(item: Pick<CostItem, 'category' | 'subcategory' | 'description'>): string {
+  const sub = subcategoryLabel(item.category, item.subcategory);
+  if (sub) return sub;
+  return item.description?.trim() || categoryLabel(item.category);
+}
+
+// Detalhe secundário (a observação livre, quando existe e não é o próprio rótulo).
+export function itemNote(item: Pick<CostItem, 'category' | 'subcategory' | 'description'>): string {
+  const d = item.description?.trim();
+  return d && d !== subcategoryLabel(item.category, item.subcategory) ? d : '';
+}
 
 // Valor total de um item: prioriza quantidade × preço unitário quando ambos existem.
 export function itemAmount(item: Pick<CostItem, 'quantity' | 'unitPrice' | 'amount'>): number {
@@ -72,6 +180,16 @@ export type HarvestInput = {
 
 export type CategoryBreakdown = { key: CategoryKey; label: string; total: number; pct: number };
 
+// Comparação insumo a insumo (R$/ha) contra a base Agrarium — o "compare com outros".
+export type SurveyCompareRow = {
+  key: string;
+  label: string;
+  value: number; // R$/ha do produtor
+  ref: number; // R$/ha de referência (mediana da base)
+  deltaPct: number; // (value − ref) / ref × 100
+  status: Status;
+};
+
 export type HarvestResult = {
   input: HarvestInput;
   producaoT: number;
@@ -86,9 +204,18 @@ export type HarvestResult = {
   margemKgAtr: number; // preço do ATR − custo por kg de ATR
   breakEvenTch: number; // produtividade (t/ha) que zera a margem
   breakdown: CategoryBreakdown[]; // categorias com gasto, da maior para a menor
-  score: number; // 0–100
-  status: Status;
+  surveyComparison: SurveyCompareRow[]; // insumos comparados com a base (R$/ha)
   recommendations: string[];
+};
+
+// ── Base de referência (o "DB" com que comparamos) ────────────────────────────
+// Enquanto não há backend, a referência vem do questionário "Custos Cana Soca".
+// Depois isto vira uma consulta ao banco (região × porte). Ver `docs/questions.md`.
+export const SURVEY_REFERENCE = {
+  n: 16,
+  region: 'Centro-Sul (SP/MG/MS)',
+  window: 'jun–jul/2026',
+  note: 'Mediana R$/ha, apenas insumo (custo direto). Base Agrarium — questionário Custos Cana Soca.',
 };
 
 // ── Benchmarks do setor (ESTIMATIVA — §8 do doc, a validar com o agrônomo) ────
@@ -106,7 +233,14 @@ export const BENCHMARK = {
 // Custo de referência por kg de ATR, derivado do benchmark (~R$ 0,77/kg).
 export const benchCustoKgAtr = BENCHMARK.custoT / BENCHMARK.atr;
 
-const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+// Status de comparação com uma referência (usado no relatório e no painel).
+export function compareStatus(value: number, ref: number, lowerIsBetter: boolean): Status {
+  if (ref <= 0) return 'bom';
+  const ratio = value / ref;
+  if (lowerIsBetter) return ratio <= 1 ? 'bom' : ratio <= 1.15 ? 'atencao' : 'critico';
+  return ratio >= 1 ? 'bom' : ratio >= 0.85 ? 'atencao' : 'critico';
+}
+
 const num = (x: number, digits = 0) =>
   x.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
@@ -133,9 +267,10 @@ export function computeHarvest(input: HarvestInput): HarvestResult {
   const breakEvenTch = receitaPorTch > 0 ? custoTotal / receitaPorTch : 0;
 
   const breakdown = buildBreakdown(input.items, custoTotal);
-  const { score, status } = buildScore({ custoKgAtr, tch, margemKgAtr, precoAtr: input.precoAtr });
+  const surveyComparison = buildSurveyComparison(input.items, areaHa);
   const recommendations = buildRecommendations({
     breakdown,
+    survey: surveyComparison,
     custoKgAtr,
     tch,
     breakEvenTch,
@@ -157,10 +292,27 @@ export function computeHarvest(input: HarvestInput): HarvestResult {
     margemKgAtr,
     breakEvenTch,
     breakdown,
-    score,
-    status,
+    surveyComparison,
     recommendations,
   };
+}
+
+// Compara os insumos lançados (convertidos p/ R$/ha) com a mediana da base.
+// Só entram subcategorias que têm referência (`refHa`) — os tratos da soca.
+function buildSurveyComparison(items: CostItem[], areaHa: number): SurveyCompareRow[] {
+  if (areaHa <= 0) return [];
+  return SUBCATEGORIES.tratos_soca
+    .filter((s) => s.refHa != null)
+    .map((s) => {
+      const total = items
+        .filter((i) => i.category === 'tratos_soca' && i.subcategory === s.key)
+        .reduce((sum, i) => sum + itemAmount(i), 0);
+      const value = total / areaHa;
+      const ref = s.refHa as number;
+      const deltaPct = ref > 0 ? ((value - ref) / ref) * 100 : 0;
+      return { key: s.key, label: s.label, value, ref, deltaPct, status: compareStatus(value, ref, true) };
+    })
+    .filter((r) => r.value > 0); // só mostra o que o produtor de fato lançou
 }
 
 function buildBreakdown(items: CostItem[], custoTotal: number): CategoryBreakdown[] {
@@ -172,29 +324,9 @@ function buildBreakdown(items: CostItem[], custoTotal: number): CategoryBreakdow
     .sort((a, b) => b.total - a.total);
 }
 
-// Score 0–100 com pesos PLACEHOLDER (validar — Q13/Q14):
-// eficiência de custo (R$/kg ATR) 50% · produtividade 25% · margem 25%.
-function buildScore(p: {
-  custoKgAtr: number;
-  tch: number;
-  margemKgAtr: number;
-  precoAtr: number;
-}): { score: number; status: Status } {
-  // Custo: abaixo do benchmark é bom. Igual → 50; metade do custo → 100; dobro → 0.
-  const custoScore = p.custoKgAtr > 0 ? clamp(benchCustoKgAtr / p.custoKgAtr, 0, 2) * 50 : 50;
-  // Produtividade: igual ao setor → 50; o dobro → 100.
-  const prodScore = clamp(p.tch / BENCHMARK.tch, 0, 2) * 50;
-  // Margem: margem zero → 50; +50% do preço → 100; −50% → 0.
-  const margemRatio = p.precoAtr > 0 ? clamp(p.margemKgAtr / p.precoAtr, -0.5, 0.5) : 0;
-  const margemScore = (margemRatio + 0.5) * 100;
-
-  const score = Math.round(clamp(0.5 * custoScore + 0.25 * prodScore + 0.25 * margemScore, 0, 100));
-  const status: Status = score >= 60 ? 'bom' : score >= 40 ? 'atencao' : 'critico';
-  return { score, status };
-}
-
 function buildRecommendations(p: {
   breakdown: CategoryBreakdown[];
+  survey: SurveyCompareRow[];
   custoKgAtr: number;
   tch: number;
   breakEvenTch: number;
@@ -204,6 +336,16 @@ function buildRecommendations(p: {
   const recs: string[] = [];
   const cct = p.breakdown.find((b) => b.key === 'colheita_cct');
   const arr = p.breakdown.find((b) => b.key === 'arrendamento');
+
+  // Maior desvio acima da base de insumos (o "compare com outros" vira conselho).
+  const acima = p.survey
+    .filter((s) => s.deltaPct > 15)
+    .sort((a, b) => b.value - b.ref - (a.value - a.ref))[0];
+  if (acima) {
+    recs.push(
+      `Em ${acima.label.toLowerCase()} você gasta ${brl(acima.value)}/ha, ${num(acima.deltaPct)}% acima da referência da base (~${brl(acima.ref)}/ha). Vale revisar produto/dose.`,
+    );
+  }
 
   if (cct && cct.pct > BENCHMARK.mixColheitaCctPct + 5) {
     const extra =
@@ -262,25 +404,28 @@ export const EXAMPLE_INPUT: HarvestInput = {
   contratoTipo: 'intermediario',
   modalidade: 'embarcada',
   items: [
-    // Tratos da soca
-    { id: 'i1', description: 'Ureia (45% N)', category: 'tratos_soca', quantity: 20000, unit: 'kg', unitPrice: 3.2, amount: 64000 },
-    { id: 'i2', description: 'Cloreto de potássio (KCl)', category: 'tratos_soca', quantity: 16000, unit: 'kg', unitPrice: 3.8, amount: 60800 },
-    { id: 'i3', description: 'Calcário dolomítico', category: 'tratos_soca', quantity: 160, unit: 't', unitPrice: 180, amount: 28800 },
-    { id: 'i4', description: 'Herbicida (glifosato)', category: 'tratos_soca', quantity: 480, unit: 'L', unitPrice: 28, amount: 13440 },
-    { id: 'i5', description: 'Inseticida (controle de broca)', category: 'tratos_soca', amount: 9500 },
-    { id: 'i6', description: 'Aplicação/adubação (operação)', category: 'tratos_soca', amount: 18000 },
+    // Tratos da soca — insumos (subcategoria da lista fechada; amount = R$/ha × 80 ha)
+    { id: 'i1', category: 'tratos_soca', subcategory: 'npk', description: 'Ureia (45% N)', quantity: 20000, unit: 'kg', unitPrice: 3.2, amount: 64000 },
+    { id: 'i2', category: 'tratos_soca', subcategory: 'npk', description: 'Cloreto de potássio (KCl)', quantity: 16000, unit: 'kg', unitPrice: 3.8, amount: 60800 },
+    { id: 'i3', category: 'tratos_soca', subcategory: 'calcario', description: 'Calcário dolomítico', quantity: 160, unit: 't', unitPrice: 180, amount: 28800 },
+    { id: 'i4', category: 'tratos_soca', subcategory: 'gesso', description: 'Gesso agrícola', amount: 16000 },
+    { id: 'i5', category: 'tratos_soca', subcategory: 'foliar', description: '', applications: '2 aplicações', mode: 'Aérea - drone', amount: 20800 },
+    { id: 'i6', category: 'tratos_soca', subcategory: 'broca', description: '', applications: '2 aplicações', mode: 'Terrestre - barra total', amount: 9500 },
+    { id: 'i7', category: 'tratos_soca', subcategory: 'cigarrinha', description: '', applications: '2 aplicações', mode: 'Terrestre - corte de soqueira', amount: 12800 },
+    { id: 'i8', category: 'tratos_soca', subcategory: 'herbicida', description: 'Glifosato', applications: '2 aplicações', mode: 'Terrestre - barra total', quantity: 480, unit: 'L', unitPrice: 28, amount: 13440 },
+    { id: 'i9', category: 'tratos_soca', subcategory: 'tratos_aplicacao', description: 'Operação de aplicação/adubação', amount: 18000 },
     // Formação (reforma parcial ~12 ha)
-    { id: 'i7', description: 'Mudas (reforma parcial 12 ha)', category: 'formacao', amount: 22000 },
-    { id: 'i8', description: 'Preparo de solo (aração/gradagem)', category: 'formacao', amount: 16500 },
+    { id: 'i10', category: 'formacao', subcategory: 'mudas', description: 'Reforma parcial 12 ha', amount: 22000 },
+    { id: 'i11', category: 'formacao', subcategory: 'preparo_solo', description: 'Aração/gradagem', amount: 16500 },
     // Colheita / CCT
-    { id: 'i9', description: 'Corte mecanizado', category: 'colheita_cct', quantity: 6240, unit: 't', unitPrice: 22, amount: 137280 },
-    { id: 'i10', description: 'Transbordo / carregamento', category: 'colheita_cct', amount: 34000 },
-    { id: 'i11', description: 'Transporte até a usina', category: 'colheita_cct', quantity: 6240, unit: 't', unitPrice: 12, amount: 74880 },
+    { id: 'i12', category: 'colheita_cct', subcategory: 'corte', description: 'Corte mecanizado', quantity: 6240, unit: 't', unitPrice: 22, amount: 137280 },
+    { id: 'i13', category: 'colheita_cct', subcategory: 'transbordo', description: '', amount: 34000 },
+    { id: 'i14', category: 'colheita_cct', subcategory: 'transporte', description: '', quantity: 6240, unit: 't', unitPrice: 12, amount: 74880 },
     // Arrendamento
-    { id: 'i12', description: 'Arrendamento da terra', category: 'arrendamento', quantity: 80, unit: 'ha', unitPrice: 1200, amount: 96000 },
+    { id: 'i15', category: 'arrendamento', subcategory: 'arrend_terra', description: '', quantity: 80, unit: 'ha', unitPrice: 1200, amount: 96000 },
     // Outros
-    { id: 'i13', description: 'Mão de obra fixa (tratorista/apontador)', category: 'outros', amount: 42000 },
-    { id: 'i14', description: 'Conservação de estradas', category: 'outros', amount: 11000 },
-    { id: 'i15', description: 'Energia e diversos', category: 'outros', amount: 8000 },
+    { id: 'i16', category: 'outros', subcategory: 'mao_obra', description: 'Tratorista/apontador', amount: 42000 },
+    { id: 'i17', category: 'outros', subcategory: 'conservacao', description: '', amount: 11000 },
+    { id: 'i18', category: 'outros', subcategory: 'energia', description: 'Energia e diversos', amount: 8000 },
   ],
 };
