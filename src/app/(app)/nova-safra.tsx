@@ -14,13 +14,19 @@ import { BarRow } from '@/components/BarRow';
 import { Stepper } from '@/components/Stepper';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
+import { Select } from '@/components/ui/Select';
 import {
+  APLICACOES,
   CATEGORIES,
   categoryLabel,
   CONTRATO_TIPOS,
   EXAMPLE_INPUT,
+  findSubcategory,
   itemAmount,
+  itemLabel,
+  itemNote,
   MODALIDADES,
+  subcategoriesFor,
   UNITS,
   type CategoryKey,
   type ContratoTipo,
@@ -92,12 +98,17 @@ export default function NovaSafra() {
   const [items, setItems] = useState<CostItem[]>([]);
 
   // Formulário de adicionar/editar item
-  const [desc, setDesc] = useState('');
   const [cat, setCat] = useState<CategoryKey>('tratos_soca');
+  const [sub, setSub] = useState<string | undefined>(undefined);
+  const [applications, setApplications] = useState<string | undefined>(undefined);
+  const [mode, setMode] = useState<string | undefined>(undefined);
+  const [desc, setDesc] = useState(''); // observação livre (opcional)
   const [qty, setQty] = useState('');
   const [unit, setUnit] = useState<Unit>('R$');
   const [unitPrice, setUnitPrice] = useState('');
   const [valorTotal, setValorTotal] = useState('');
+
+  const subMeta = findSubcategory(cat, sub);
 
   const qtyN = parseNum(qty);
   const priceN = parseNum(unitPrice);
@@ -124,6 +135,9 @@ export default function NovaSafra() {
   }
 
   function resetItemForm() {
+    setSub(undefined);
+    setApplications(undefined);
+    setMode(undefined);
     setDesc('');
     setQty('');
     setUnit('R$');
@@ -131,10 +145,18 @@ export default function NovaSafra() {
     setValorTotal('');
   }
 
+  // Trocar de categoria zera a subcategoria (a lista muda).
+  function changeCategory(next: CategoryKey) {
+    setCat(next);
+    setSub(undefined);
+    setApplications(undefined);
+    setMode(undefined);
+  }
+
   function addItem() {
     const amount = previewAmount;
-    if (!desc.trim()) {
-      setErr('Descreva o item (ex.: "Ureia", "Diesel do trator").');
+    if (!sub) {
+      setErr('Escolha a subcategoria do custo na lista.');
       return;
     }
     if (amount == null || amount <= 0) {
@@ -143,9 +165,12 @@ export default function NovaSafra() {
     }
     const item: CostItem = {
       id: newId(),
-      description: desc.trim(),
       category: cat,
+      subcategory: sub,
+      description: desc.trim(),
       amount,
+      ...(subMeta?.applications && applications ? { applications } : {}),
+      ...(subMeta?.modes && mode ? { mode } : {}),
       ...(qtyN != null ? { quantity: qtyN } : {}),
       ...(qtyN != null ? { unit } : {}),
       ...(priceN != null ? { unitPrice: priceN } : {}),
@@ -156,8 +181,11 @@ export default function NovaSafra() {
   }
 
   function editItem(item: CostItem) {
-    setDesc(item.description);
     setCat(item.category);
+    setSub(item.subcategory);
+    setApplications(item.applications);
+    setMode(item.mode);
+    setDesc(itemNote(item));
     setQty(item.quantity != null ? String(item.quantity) : '');
     setUnit(item.unit ?? 'R$');
     setUnitPrice(item.unitPrice != null ? String(item.unitPrice) : '');
@@ -240,9 +268,37 @@ export default function NovaSafra() {
 
             {/* Formulário de item */}
             <View style={styles.itemForm}>
-              <Field label="Descrição" value={desc} onChangeText={setDesc}
-                placeholder="Ureia, Diesel do trator, Glifosato…" />
-              <PillGroup label="Categoria" options={CATEGORIES} value={cat} onChange={setCat} />
+              <Select label="Categoria" options={CATEGORIES} value={cat} onChange={changeCategory} />
+              <Select
+                label="Subcategoria"
+                placeholder="Escolha o item de custo…"
+                hint="Lista fechada — ajuda a comparar com outros produtores depois."
+                options={subcategoriesFor(cat)}
+                value={sub}
+                onChange={setSub}
+              />
+
+              {subMeta?.applications ? (
+                <Select
+                  label="Nº de aplicações"
+                  placeholder="Selecione…"
+                  options={APLICACOES.map((a) => ({ key: a, label: a }))}
+                  value={applications}
+                  onChange={setApplications}
+                />
+              ) : null}
+              {subMeta?.modes ? (
+                <Select
+                  label="Modalidade de aplicação"
+                  placeholder="Selecione…"
+                  options={subMeta.modes.map((m) => ({ key: m, label: m }))}
+                  value={mode}
+                  onChange={setMode}
+                />
+              ) : null}
+
+              <Field label="Observação (opcional)" value={desc} onChangeText={setDesc}
+                placeholder="Ex.: produto/marca, detalhe…" />
 
               <View style={styles.row3}>
                 <View style={styles.col}>
@@ -278,9 +334,12 @@ export default function NovaSafra() {
                 {items.map((i) => (
                   <Pressable key={i.id} onPress={() => editItem(i)} style={styles.itemRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.itemDesc} numberOfLines={1}>{i.description}</Text>
-                      <Text style={styles.itemMeta}>
+                      <Text style={styles.itemDesc} numberOfLines={1}>{itemLabel(i)}</Text>
+                      <Text style={styles.itemMeta} numberOfLines={1}>
                         {categoryLabel(i.category)}
+                        {itemNote(i) ? ` · ${itemNote(i)}` : ''}
+                        {i.applications ? ` · ${i.applications}` : ''}
+                        {i.mode ? ` · ${i.mode}` : ''}
                         {i.quantity != null && i.unitPrice != null
                           ? ` · ${i.quantity} ${i.unit} × ${brl(i.unitPrice)}`
                           : ''}
