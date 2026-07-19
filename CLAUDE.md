@@ -5,9 +5,10 @@
 Agrarium app for sugarcane producers. One codebase → **iOS, Android and web** (Expo Router
 + React Native Web). Consumes the Rails API in `../agrarium-backend`.
 
-**Current stage: login/sign up + a welcome screen only.** The harvest-input flow and the
-cost indicators will be designed later (the producer's cost is **detailed**, and the model
-is still to be defined). Principle: dumb frontend, business logic lives in the backend.
+**Current stage: auth + harvest flow (V0).** Producers enter a safra (plant-cane/ratoon split
++ detailed cost items) and get a server-computed report — cost per kg ATR, comparison against a
+live base, and sector benchmark. All calc lives in the backend; the app reads it via React Query
+(`lib/harvests-api.ts`). Principle: dumb frontend, business logic lives in the backend.
 
 > Product context lives in `../app.md` and `../knowledge.md` (root of the parent repo).
 
@@ -36,13 +37,17 @@ src/
 │  ├─ register.tsx         # sign up
 │  └─ (app)/
 │     ├─ _layout.tsx       # protected group (auth guard)
-│     └─ dashboard.tsx     # welcome-only for now
+│     ├─ dashboard.tsx     # list of analyzed safras (useHarvests)
+│     ├─ nova-safra.tsx    # safra wizard (dados + custos) → POST /harvests
+│     └─ resultado.tsx     # server report (useHarvest)
 ├─ lib/
 │  ├─ api.ts               # axios + Bearer-token interceptor (EXPO_PUBLIC_API_URL)
 │  ├─ auth.tsx             # AuthContext (signIn/signUp/signOut, /me on boot)
+│  ├─ harvest.ts           # form taxonomy + display helpers (NO calc — backend owns it)
+│  ├─ harvests-api.ts      # React Query hooks + API DTO types
 │  ├─ storage.ts           # cross-platform token: SecureStore (native) / localStorage (web)
 │  └─ theme.ts             # Agrarium colors + helpers
-├─ components/ui/          # Button, Field, Card
+├─ components/             # Stepper, BarRow, MetricCard, CostChart, ui/ (Button, Field, Card, Select)
 └─ assets/images/logo.png  # Agrarium logo (used on login)
 ```
 
