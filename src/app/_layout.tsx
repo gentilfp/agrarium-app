@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider } from "@/lib/auth";
-import { HarvestProvider } from "@/lib/harvest-store";
 import { colors } from "@/lib/theme";
 
 const queryClient = new QueryClient();
@@ -13,7 +12,6 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <HarvestProvider>
         <SafeAreaProvider>
           <StatusBar style="light" />
           <Stack
@@ -30,7 +28,6 @@ export default function RootLayout() {
             <Stack.Screen name="(app)" options={{ headerShown: false }} />
           </Stack>
         </SafeAreaProvider>
-        </HarvestProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

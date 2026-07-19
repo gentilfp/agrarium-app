@@ -1,40 +1,32 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BarRow } from '@/components/BarRow';
 import { CHART_COLORS, CompareBars, StackedBar } from '@/components/CostChart';
 import { MetricCard } from '@/components/MetricCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import {
-  BENCHMARK,
-  benchCustoKgAtr,
-  compareStatus,
-  CONTRATO_TIPOS,
-  itemAmount,
-  itemLabel,
-  itemNote,
-  MODALIDADES,
-  SURVEY_REFERENCE,
-} from '@/lib/harvest';
-import { useHarvest } from '@/lib/harvest-store';
+import { useHarvest, type BenchmarkRow } from '@/lib/harvests-api';
 import { brl, colors, statusColor, type Status } from '@/lib/theme';
 
 const num = (x: number, d = 0) =>
   x.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-function BenchRow({
-  label,
-  value,
-  ref,
-  status,
-}: {
-  label: string;
-  value: string;
-  ref: string;
-  status: Status;
-}) {
+function fmtBench(row: BenchmarkRow): { value: string; ref: string } {
+  switch (row.format) {
+    case 'brl':
+      return { value: brl(row.value, 0), ref: brl(row.ref, 0) };
+    case 'brl4':
+      return { value: brl(row.value, 4), ref: brl(row.ref, 4) };
+    case 't_ha':
+      return { value: `${num(row.value, 1)} t/ha`, ref: `${num(row.ref, 0)} t/ha` };
+    case 'kg_t':
+      return { value: `${num(row.value, 0)} kg/t`, ref: `${num(row.ref, 0)} kg/t` };
+  }
+}
+
+function BenchRow({ label, value, ref, status }: { label: string; value: string; ref: string; status: Status }) {
   return (
     <View style={styles.benchRow}>
       <Text style={styles.benchLabel}>{label}</Text>
@@ -48,14 +40,21 @@ function BenchRow({
 
 export default function Resultado() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { latest, getById } = useHarvest();
+  const { data, isLoading, isError } = useHarvest(id);
   const [showMethod, setShowMethod] = useState(false);
-  const analysis = id ? getById(id) : latest;
 
-  if (!analysis) {
+  if (isLoading) {
     return (
       <View style={styles.emptyWrap}>
-        <Text style={styles.emptyTitle}>Nenhuma análise ainda</Text>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <View style={styles.emptyWrap}>
+        <Text style={styles.emptyTitle}>Não foi possível abrir a análise</Text>
         <Text style={styles.emptySub}>Lance os dados de uma safra para ver o relatório.</Text>
         <View style={{ alignSelf: 'stretch', marginTop: 20 }}>
           <Button title="Lançar nova safra" onPress={() => router.replace('/nova-safra')} />
@@ -64,10 +63,10 @@ export default function Resultado() {
     );
   }
 
-  const r = analysis;
-  const contrato = CONTRATO_TIPOS.find((c) => c.key === r.input.contratoTipo)?.label ?? '—';
-  const modalidade = MODALIDADES.find((m) => m.key === r.input.modalidade)?.label ?? '—';
-  const margemColor = r.margem >= 0 ? colors.good : colors.danger;
+  const { input, report: r } = data;
+  const margemColor = r.margin >= 0 ? colors.good : colors.danger;
+  const kgAtrBench = r.sector_benchmark.find((b) => b.key === 'cost_per_kg_atr');
+  const meta = r.reference_meta;
 
   const segments = r.breakdown.map((b, i) => ({
     label: b.label,
@@ -76,72 +75,86 @@ export default function Resultado() {
     color: CHART_COLORS[i % CHART_COLORS.length],
   }));
 
+  const compareRows = r.survey_comparison.map((s) => ({
+    key: s.key,
+    label: s.label,
+    value: s.value_per_ha,
+    ref: s.ref_per_ha,
+    deltaPct: s.delta_pct,
+    status: s.status,
+  }));
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.mockTag}>Estimativa · protótipo</Text>
 
       {/* Cabeçalho da safra */}
       <Card>
-        <Text style={styles.safra}>Safra {r.input.safra}</Text>
+        <Text style={styles.safra}>Safra {input.crop_year}</Text>
         <Text style={styles.meta}>
-          {num(r.input.areaHa)} ha · {num(r.producaoT)} t · {num(r.tch, 1)} t/ha · ATR {num(r.input.atr)} kg/t
+          {num(input.plant_cane_area_ha ?? 0)} ha planta · {num(input.ratoon_area_ha ?? 0)} ha soca ·{' '}
+          {num(r.total_production_t)} t · {num(r.tch, 1)} t/ha · ATR {num(input.atr_kg_per_t ?? 0)} kg/t
         </Text>
         <Text style={styles.meta}>
-          {contrato} · {modalidade} · preço ATR {brl(r.input.precoAtr, 2)}/kg
+          {input.contract_type_label ?? 'Contrato não informado'} ·{' '}
+          {input.delivery_modality_label ?? 'Modalidade não informada'} · preço ATR{' '}
+          {brl(input.atr_price ?? 0, 2)}/kg
         </Text>
       </Card>
 
       {/* Indicador-chave */}
       <Card style={styles.heroCard}>
         <Text style={styles.heroLabel}>Custo por kg de ATR</Text>
-        <Text style={[styles.hero, { color: statusColor(compareStatus(r.custoKgAtr, benchCustoKgAtr, true)) }]}>
-          {brl(r.custoKgAtr, 4)}
+        <Text style={[styles.hero, { color: statusColor(kgAtrBench?.status) }]}>
+          {brl(r.cost_per_kg_atr, 4)}
         </Text>
         <Text style={styles.heroSub}>
-          Margem {brl(r.margemKgAtr, 4)}/kg ATR · referência {brl(benchCustoKgAtr, 4)}
+          Margem {brl(r.margin_per_kg_atr, 4)}/kg ATR
+          {kgAtrBench ? ` · referência ${brl(kgAtrBench.ref, 4)}` : ''}
         </Text>
       </Card>
 
       <View style={styles.metricRow}>
-        <MetricCard label="Custo / t" value={brl(r.custoT)} />
-        <MetricCard label="Custo / ha" value={brl(r.custoHa)} />
+        <MetricCard label="Custo / t" value={brl(r.cost_per_t)} />
+        <MetricCard label="Custo / ha" value={brl(r.cost_per_ha)} />
       </View>
 
-      {/* Resultado financeiro (sem classificação — comparamos com a base) */}
+      {/* Resultado financeiro */}
       <Card>
         <View style={styles.finRow}>
           <View style={styles.finCell}>
             <Text style={styles.finLabel}>Receita</Text>
-            <Text style={styles.finValue}>{brl(r.receita)}</Text>
+            <Text style={styles.finValue}>{brl(r.revenue)}</Text>
           </View>
           <View style={styles.finCell}>
             <Text style={styles.finLabel}>Margem</Text>
-            <Text style={[styles.finValue, { color: margemColor }]}>{brl(r.margem)}</Text>
+            <Text style={[styles.finValue, { color: margemColor }]}>{brl(r.margin)}</Text>
           </View>
           <View style={styles.finCell}>
             <Text style={styles.finLabel}>Equilíbrio</Text>
-            <Text style={styles.finValue}>{num(r.breakEvenTch, 1)} t/ha</Text>
+            <Text style={styles.finValue}>{num(r.break_even_tch, 1)} t/ha</Text>
           </View>
         </View>
       </Card>
 
-      {/* Gráfico de composição do custo */}
+      {/* Composição do custo */}
       <Text style={styles.h2}>Onde você está gastando</Text>
       <Card>
         <StackedBar segments={segments} />
       </Card>
 
-      {/* Comparação com outros produtores (base Agrarium) */}
+      {/* Comparação com outros produtores (base viva) */}
       <Text style={styles.h2}>Como você se compara</Text>
       <Card>
-        {r.surveyComparison.length > 0 ? (
+        {compareRows.length > 0 ? (
           <>
             <Text style={styles.compareIntro}>
-              Seus insumos (R$/ha) vs. a referência da base — {SURVEY_REFERENCE.n} produtores,{' '}
-              {SURVEY_REFERENCE.region}.
+              Seus insumos (R$/ha) vs. a referência da base — {meta.n} produtor(es), {meta.region}.
             </Text>
-            <CompareBars rows={r.surveyComparison} format={(n) => brl(n, 0)} />
-            <Text style={styles.sourceNote}>{SURVEY_REFERENCE.note}</Text>
+            <CompareBars rows={compareRows} format={(n) => brl(n, 0)} />
+            <Text style={styles.sourceNote}>
+              Mediana R$/ha da base, recalculada a cada nova safra lançada.
+            </Text>
           </>
         ) : (
           <Text style={styles.compareIntro}>
@@ -150,11 +163,11 @@ export default function Resultado() {
         )}
       </Card>
 
-      {/* Tabela itemizada (o "Excel") */}
+      {/* Tabela itemizada */}
       <Text style={styles.h2}>Custos discriminados</Text>
       <Card>
         {r.breakdown.map((b) => {
-          const rows = r.input.items.filter((i) => i.category === b.key);
+          const rows = input.cost_items.filter((i) => i.category === b.key);
           return (
             <View key={b.key} style={styles.group}>
               <View style={styles.groupHead}>
@@ -166,19 +179,19 @@ export default function Resultado() {
               {rows.map((i) => (
                 <View key={i.id} style={styles.tableRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowDesc}>{itemLabel(i)}</Text>
-                    {itemNote(i) || i.applications || i.mode ? (
+                    <Text style={styles.rowDesc}>{i.label}</Text>
+                    {i.note || i.applications || i.application_mode ? (
                       <Text style={styles.rowMeta}>
-                        {[itemNote(i), i.applications, i.mode].filter(Boolean).join(' · ')}
+                        {[i.note, i.applications, i.application_mode].filter(Boolean).join(' · ')}
                       </Text>
                     ) : null}
-                    {i.quantity != null && i.unitPrice != null ? (
+                    {i.quantity != null && i.unit_price != null ? (
                       <Text style={styles.rowMeta}>
-                        {num(i.quantity, 0)} {i.unit} × {brl(i.unitPrice)}
+                        {num(i.quantity, 0)} {i.unit} × {brl(i.unit_price)}
                       </Text>
                     ) : null}
                   </View>
-                  <Text style={styles.rowAmount}>{brl(itemAmount(i))}</Text>
+                  <Text style={styles.rowAmount}>{brl(i.amount)}</Text>
                 </View>
               ))}
             </View>
@@ -186,11 +199,11 @@ export default function Resultado() {
         })}
         <View style={styles.grandTotal}>
           <Text style={styles.grandLabel}>Custo total</Text>
-          <Text style={styles.grandValue}>{brl(r.custoTotal)}</Text>
+          <Text style={styles.grandValue}>{brl(r.total_cost)}</Text>
         </View>
       </Card>
 
-      {/* Decomposição em barras (detalhe por bloco) */}
+      {/* Decomposição em barras */}
       <Card>
         {r.breakdown.map((b) => (
           <BarRow
@@ -198,22 +211,18 @@ export default function Resultado() {
             label={b.label}
             pct={b.pct}
             value={brl(b.total)}
-            color={b.key === 'colheita_cct' ? colors.warn : colors.primary}
+            color={b.key === 'harvest_cct' ? colors.warn : colors.primary}
           />
         ))}
       </Card>
 
-      {/* Comparação com o mercado (referência do setor) */}
+      {/* Referência do setor */}
       <Text style={styles.h2}>Referência do setor</Text>
       <Card>
-        <BenchRow label="Custo / t" value={brl(r.custoT)} ref={`${brl(BENCHMARK.custoT)}`}
-          status={compareStatus(r.custoT, BENCHMARK.custoT, true)} />
-        <BenchRow label="Custo / kg ATR" value={brl(r.custoKgAtr, 4)} ref={brl(benchCustoKgAtr, 4)}
-          status={compareStatus(r.custoKgAtr, benchCustoKgAtr, true)} />
-        <BenchRow label="Produtividade" value={`${num(r.tch, 1)} t/ha`} ref={`${BENCHMARK.tch} t/ha`}
-          status={compareStatus(r.tch, BENCHMARK.tch, false)} />
-        <BenchRow label="Qualidade (ATR)" value={`${num(r.input.atr)} kg/t`} ref={`${BENCHMARK.atr} kg/t`}
-          status={compareStatus(r.input.atr, BENCHMARK.atr, false)} />
+        {r.sector_benchmark.map((row) => {
+          const f = fmtBench(row);
+          return <BenchRow key={row.key} label={row.label} value={f.value} ref={f.ref} status={row.status} />;
+        })}
       </Card>
 
       {/* Recomendações */}
@@ -227,24 +236,22 @@ export default function Resultado() {
         ))}
       </Card>
 
-      {/* Como calculamos (transparência) */}
+      {/* Como calculamos */}
       <Pressable onPress={() => setShowMethod((v) => !v)} style={styles.methodToggle}>
-        <Text style={styles.methodToggleText}>
-          {showMethod ? '▾' : '▸'} Como calculamos
-        </Text>
+        <Text style={styles.methodToggleText}>{showMethod ? '▾' : '▸'} Como calculamos</Text>
       </Pressable>
       {showMethod ? (
         <Card>
           <Text style={styles.methodText}>
             Custo/t = custo total ÷ produção (t){'\n'}
-            Custo/ha = custo total ÷ área (ha){'\n'}
+            Custo/ha = custo total ÷ área colhida (planta + soca){'\n'}
             Custo/kg ATR = custo total ÷ (ATR × produção){'\n'}
             Receita = preço do ATR × ATR × produção{'\n'}
             Margem = receita − custo total
           </Text>
           <Text style={styles.methodSource}>
-            Comparação por insumo: {SURVEY_REFERENCE.note} A referência do setor vem de {BENCHMARK.source}.
-            Números a validar com o agrônomo.
+            Comparação por insumo: mediana R$/ha da base viva ({meta.n} produtores, {meta.region}),
+            recalculada a cada nova safra lançada. Números a validar com o agrônomo.
           </Text>
         </Card>
       ) : null}

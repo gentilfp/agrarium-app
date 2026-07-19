@@ -1,16 +1,15 @@
 import { router, Stack } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useAuth } from '@/lib/auth';
-import { benchCustoKgAtr, compareStatus } from '@/lib/harvest';
-import { useHarvest } from '@/lib/harvest-store';
+import { useHarvests } from '@/lib/harvests-api';
 import { brl, colors, statusColor } from '@/lib/theme';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
-  const { analyses } = useHarvest();
+  const { data: harvests, isLoading } = useHarvests();
 
   return (
     <View style={styles.screen}>
@@ -35,24 +34,26 @@ export default function Dashboard() {
           <Button title="Lançar nova safra" onPress={() => router.push('/nova-safra')} />
         </View>
 
-        {analyses.length > 0 ? (
+        {isLoading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />
+        ) : harvests && harvests.length > 0 ? (
           <>
             <Text style={styles.h2}>Safras analisadas</Text>
-            {analyses.map((a) => (
+            {harvests.map((a) => (
               <Pressable
                 key={a.id}
-                onPress={() => router.push({ pathname: '/resultado', params: { id: a.id } })}>
+                onPress={() => router.push({ pathname: '/resultado', params: { id: String(a.id) } })}>
                 <Card style={styles.rowCard}>
                   <View
                     style={[
                       styles.statusDot,
-                      { backgroundColor: statusColor(compareStatus(a.custoKgAtr, benchCustoKgAtr, true)) },
+                      { backgroundColor: statusColor(a.indicators.cost_per_kg_atr_status) },
                     ]}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>Safra {a.input.safra}</Text>
+                    <Text style={styles.rowTitle}>Safra {a.crop_year}</Text>
                     <Text style={styles.rowMeta}>
-                      {brl(a.custoKgAtr, 4)}/kg ATR · {brl(a.custoT)}/t
+                      {brl(a.indicators.cost_per_kg_atr, 4)}/kg ATR · {brl(a.indicators.cost_per_t)}/t
                     </Text>
                   </View>
                   <Text style={styles.chevron}>›</Text>
