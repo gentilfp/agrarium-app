@@ -3,6 +3,20 @@
 // chegam prontos via API (ver `harvests-api.ts`). Aqui ficam só a taxonomia (lista
 // fechada para o formulário) e os helpers de exibição.
 
+// ── Culturas (espelham a tabela `crops` do backend) ──────────────────────────
+export type CropSlug = 'cana-de-acucar' | 'soja' | 'milho' | 'cafe';
+
+export const CROPS: { slug: CropSlug; name: string; unit: string }[] = [
+  { slug: 'cana-de-acucar', name: 'Cana-de-açúcar', unit: 't' },
+  { slug: 'soja', name: 'Soja', unit: 'sc' },
+  { slug: 'milho', name: 'Milho', unit: 'sc' },
+  { slug: 'cafe', name: 'Café', unit: 'sc' },
+];
+
+export const isSugarcane = (slug?: CropSlug | string | null) => slug === 'cana-de-acucar';
+export const cropBySlug = (slug?: string | null) => CROPS.find((c) => c.slug === slug);
+export const cropName = (slug?: string | null) => cropBySlug(slug)?.name ?? 'Safra';
+
 // ── Categorias (chaves em inglês, espelham o CostTaxonomy do backend) ─────────
 export type CategoryKey = 'formation' | 'ratoon_treatments' | 'harvest_cct' | 'land_lease' | 'other';
 
@@ -140,16 +154,20 @@ export function itemAmount(item: Pick<CostItem, 'quantity' | 'unitPrice' | 'amou
   return item.amount || 0;
 }
 
-// Dados que o formulário coleta (safra planta/soca + itens). Vira o corpo do POST.
+// Dados que o formulário coleta. Cana usa o recorte planta/soca + ATR; as demais
+// culturas usam área cultivada + quantidade produzida + preço de venda. Vira o POST.
 export type HarvestFormInput = {
-  cropYear: string; // ex.: "25/26"
-  plantCaneAreaHa?: number; // área colheita cana-planta
-  ratoonAreaHa?: number; // área colheita cana-soca
-  totalAreaHa?: number; // inclui reforma/rotação
+  crop: CropSlug; // ex.: "cana-de-acucar"
+  cropYear: string; // ex.: "2025/26"
+  plantCaneAreaHa?: number; // área colheita cana-planta (só cana)
+  ratoonAreaHa?: number; // área colheita cana-soca (só cana)
+  totalAreaHa?: number; // cana: inclui reforma/rotação · demais: área cultivada
   plantCaneProductionT?: number;
   ratoonProductionT?: number;
-  atrKgPerT?: number; // kg de ATR por tonelada
-  atrPrice?: number; // R$ por kg de ATR
+  productionQuantity?: number; // demais culturas, na unidade da cultura (sc)
+  salePrice?: number; // R$ por unidade produzida (demais culturas)
+  atrKgPerT?: number; // kg de ATR por tonelada (só cana)
+  atrPrice?: number; // R$ por kg de ATR (só cana)
   contractType: ContractType | null; // opcional
   deliveryModality: DeliveryModality | null; // opcional
   items: CostItem[];
@@ -157,7 +175,8 @@ export type HarvestFormInput = {
 
 // ── Exemplo pré-preenchido (safra com reforma parcial: 12 ha planta / 68 ha soca) ─
 export const EXAMPLE_INPUT: HarvestFormInput = {
-  cropYear: '25/26',
+  crop: 'cana-de-acucar',
+  cropYear: '2025/26',
   plantCaneAreaHa: 12,
   ratoonAreaHa: 68,
   totalAreaHa: 90,

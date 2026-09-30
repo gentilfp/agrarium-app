@@ -21,9 +21,11 @@ import {
   CATEGORIES,
   categoryLabel,
   CONTRACT_TYPES,
+  CROPS,
   DELIVERY_MODALITIES,
   EXAMPLE_INPUT,
   findSubcategory,
+  isSugarcane,
   itemAmount,
   itemLabel,
   itemNote,
@@ -32,10 +34,11 @@ import {
   type CategoryKey,
   type ContractType,
   type CostItem,
+  type CropSlug,
   type DeliveryModality,
   type Unit,
 } from '@/lib/harvest';
-import { useCreateHarvest } from '@/lib/harvests-api';
+import { useCreateHarvest, useReference } from '@/lib/harvests-api';
 import { brl, colors } from '@/lib/theme';
 
 // Aceita vírgula decimal (pt-BR) e ponto. Retorna undefined se não for número.
@@ -93,23 +96,33 @@ export default function NovaSafra() {
   const [step, setStep] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
-  // Passo 1 — safra e produção (planta × soca)
-  const [cropYear, setCropYear] = useState('25/26');
+  // Passo 1 — cultura, safra e produção (cana: planta × soca + ATR)
+  const [crop, setCrop] = useState<CropSlug>('cana-de-acucar');
+  const [cropYear, setCropYear] = useState('2025/26');
   const [plantArea, setPlantArea] = useState('');
   const [ratoonArea, setRatoonArea] = useState('');
   const [totalArea, setTotalArea] = useState('');
   const [plantProd, setPlantProd] = useState('');
   const [ratoonProd, setRatoonProd] = useState('');
+  const [cultivatedArea, setCultivatedArea] = useState('');
+  const [productionQty, setProductionQty] = useState('');
+  const [salePrice, setSalePrice] = useState('');
   const [atr, setAtr] = useState('');
   const [precoAtr, setPrecoAtr] = useState('');
   const [contractType, setContractType] = useState<ContractType | null>(null);
   const [deliveryModality, setDeliveryModality] = useState<DeliveryModality | null>(null);
 
+  const cane = isSugarcane(crop);
+  const cropUnit = CROPS.find((c) => c.slug === crop)?.unit ?? 'un';
+  // Taxonomia vem do backend (GET /reference?crop=); a lista estática é o fallback.
+  const reference = useReference(crop);
+  const categories = reference.data?.taxonomy.categories ?? CATEGORIES;
+
   // Passo 2 — itens de custo
   const [items, setItems] = useState<CostItem[]>([]);
 
   // Formulário de adicionar/editar item
-  const [cat, setCat] = useState<CategoryKey>('ratoon_treatments');
+  const [cat, setCat] = useState<CategoryKey>('formation');
   const [sub, setSub] = useState<string | undefined>(undefined);
   const [applications, setApplications] = useState<string | undefined>(undefined);
   const [mode, setMode] = useState<string | undefined>(undefined);
@@ -119,21 +132,36 @@ export default function NovaSafra() {
   const [unitPrice, setUnitPrice] = useState('');
   const [valorTotal, setValorTotal] = useState('');
 
-  const subMeta = findSubcategory(cat, sub);
+  const serverSubcategories = reference.data?.taxonomy.categories.find((c) => c.key === cat)
+    ?.subcategories;
+  const subOptions = serverSubcategories ?? subcategoriesFor(cat);
+  const subMeta = subOptions.find((s) => s.key === sub) ?? findSubcategory(cat, sub);
 
   const qtyN = parseNum(qty);
   const priceN = parseNum(unitPrice);
   const previewAmount = qtyN != null && priceN != null ? qtyN * priceN : parseNum(valorTotal);
 
-  const totalProdDerived = (parseNum(plantProd) ?? 0) + (parseNum(ratoonProd) ?? 0);
+  const totalProdDerived = cane
+    ? (parseNum(plantProd) ?? 0) + (parseNum(ratoonProd) ?? 0)
+    : (parseNum(productionQty) ?? 0);
   const custoTotal = items.reduce((s, i) => s + itemAmount(i), 0);
-  const subtotals = CATEGORIES.map((c) => ({
+  const subtotals = categories.map((c) => ({
     ...c,
     total: items.filter((i) => i.category === c.key).reduce((s, i) => s + itemAmount(i), 0),
   })).filter((c) => c.total > 0);
 
+  function changeCrop(next: CropSlug) {
+    setCrop(next);
+    // Categorias de cana não existem nas demais culturas — volta para Formação.
+    if (!isSugarcane(next) && (cat === 'ratoon_treatments' || cat === 'harvest_cct')) {
+      changeCategory('formation');
+    }
+    setErr(null);
+  }
+
   function fillExample() {
     const e = EXAMPLE_INPUT;
+    setCrop(e.crop);
     setCropYear(e.cropYear);
     setPlantArea(String(e.plantCaneAreaHa));
     setRatoonArea(String(e.ratoonAreaHa));
@@ -212,18 +240,24 @@ export default function NovaSafra() {
   }
 
   function goToStep2() {
-    const plantA = parseNum(plantArea);
-    const ratoonA = parseNum(ratoonArea);
-    const plantP = parseNum(plantProd);
-    const ratoonP = parseNum(ratoonProd);
-    const atrN = parseNum(atr);
-    const precoN = parseNum(precoAtr);
-    if ((plantA ?? 0) <= 0 && (ratoonA ?? 0) <= 0)
-      return setErr('Informe a área colhida de cana-planta e/ou cana-soca (ha).');
-    if ((plantP ?? 0) <= 0 && (ratoonP ?? 0) <= 0)
-      return setErr('Informe a produção de cana-planta e/ou cana-soca (t).');
-    if (atrN == null || atrN <= 0) return setErr('Informe o ATR (kg/t).');
-    if (precoN == null || precoN <= 0) return setErr('Informe o preço do ATR (R$/kg).');
+    if (!cropYear.trim()) return setErr('Informe a safra (ex.: 2025/26).');
+    if (cane) {
+      const plantA = parseNum(plantArea);
+      const ratoonA = parseNum(ratoonArea);
+      const plantP = parseNum(plantProd);
+      const ratoonP = parseNum(ratoonProd);
+      const atrN = parseNum(atr);
+      const precoN = parseNum(precoAtr);
+      if ((plantA ?? 0) <= 0 && (ratoonA ?? 0) <= 0)
+        return setErr('Informe a área colhida de cana-planta e/ou cana-soca (ha).');
+      if ((plantP ?? 0) <= 0 && (ratoonP ?? 0) <= 0)
+        return setErr('Informe a produção de cana-planta e/ou cana-soca (t).');
+      if (atrN == null || atrN <= 0) return setErr('Informe o ATR (kg/t).');
+      if (precoN == null || precoN <= 0) return setErr('Informe o preço do ATR (R$/kg).');
+    } else {
+      if ((parseNum(cultivatedArea) ?? 0) <= 0)
+        return setErr('Informe a área cultivada (ha).');
+    }
     setErr(null);
     setStep(1);
   }
@@ -233,12 +267,15 @@ export default function NovaSafra() {
     setErr(null);
     try {
       const harvest = await createHarvest.mutateAsync({
+        crop,
         cropYear,
         plantCaneAreaHa: parseNum(plantArea),
         ratoonAreaHa: parseNum(ratoonArea),
-        totalAreaHa: parseNum(totalArea),
+        totalAreaHa: cane ? parseNum(totalArea) : parseNum(cultivatedArea),
         plantCaneProductionT: parseNum(plantProd),
         ratoonProductionT: parseNum(ratoonProd),
+        productionQuantity: parseNum(productionQty),
+        salePrice: parseNum(salePrice),
         atrKgPerT: parseNum(atr),
         atrPrice: parseNum(precoAtr),
         contractType,
@@ -259,50 +296,72 @@ export default function NovaSafra() {
         {step === 0 ? (
           <>
             <Text style={styles.h1}>Dados da safra</Text>
-            <Field label="Safra" value={cropYear} onChangeText={setCropYear} placeholder="25/26" />
+            <PillGroup label="Cultura" options={CROPS.map((c) => ({ key: c.slug, label: c.name }))}
+              value={crop} onChange={(c) => c && changeCrop(c)} />
+            <Field label="Safra" value={cropYear} onChangeText={setCropYear} placeholder="2025/26" />
 
-            <Text style={styles.groupLabel}>Área colhida (ha)</Text>
-            <Text style={styles.groupHint}>
-              Separe cana-planta (1º corte) de cana-soca (2º corte em diante) — elas custam e
-              produzem de forma bem diferente.
-            </Text>
-            <View style={styles.row3}>
-              <View style={styles.col}>
-                <Field label="Cana-planta" value={plantArea} onChangeText={setPlantArea}
-                  keyboardType="numeric" placeholder="12" />
-              </View>
-              <View style={styles.col}>
-                <Field label="Cana-soca" value={ratoonArea} onChangeText={setRatoonArea}
-                  keyboardType="numeric" placeholder="68" />
-              </View>
-            </View>
-            <Field label="Área total (inclui reforma/rotação)" hint="opcional — só para contexto"
-              value={totalArea} onChangeText={setTotalArea} keyboardType="numeric" placeholder="90" />
+            {cane ? (
+              <>
+                <Text style={styles.groupLabel}>Área colhida (ha)</Text>
+                <Text style={styles.groupHint}>
+                  Separe cana-planta (1º corte) de cana-soca (2º corte em diante) — elas custam e
+                  produzem de forma bem diferente.
+                </Text>
+                <View style={styles.row3}>
+                  <View style={styles.col}>
+                    <Field label="Cana-planta" value={plantArea} onChangeText={setPlantArea}
+                      keyboardType="numeric" placeholder="12" />
+                  </View>
+                  <View style={styles.col}>
+                    <Field label="Cana-soca" value={ratoonArea} onChangeText={setRatoonArea}
+                      keyboardType="numeric" placeholder="68" />
+                  </View>
+                </View>
+                <Field label="Área total (inclui reforma/rotação)" hint="opcional — só para contexto"
+                  value={totalArea} onChangeText={setTotalArea} keyboardType="numeric" placeholder="90" />
 
-            <Text style={styles.groupLabel}>Produção (t)</Text>
-            <View style={styles.row3}>
-              <View style={styles.col}>
-                <Field label="Cana-planta" value={plantProd} onChangeText={setPlantProd}
-                  keyboardType="numeric" placeholder="1200" />
-              </View>
-              <View style={styles.col}>
-                <Field label="Cana-soca" value={ratoonProd} onChangeText={setRatoonProd}
-                  keyboardType="numeric" placeholder="5040" />
-              </View>
-            </View>
-            <Text style={styles.derived}>Produção total: {totalProdDerived.toLocaleString('pt-BR')} t</Text>
+                <Text style={styles.groupLabel}>Produção (t)</Text>
+                <View style={styles.row3}>
+                  <View style={styles.col}>
+                    <Field label="Cana-planta" value={plantProd} onChangeText={setPlantProd}
+                      keyboardType="numeric" placeholder="1200" />
+                  </View>
+                  <View style={styles.col}>
+                    <Field label="Cana-soca" value={ratoonProd} onChangeText={setRatoonProd}
+                      keyboardType="numeric" placeholder="5040" />
+                  </View>
+                </View>
+                <Text style={styles.derived}>Produção total: {totalProdDerived.toLocaleString('pt-BR')} t</Text>
 
-            <Field label="ATR (kg/t)" hint="da usina, ou uma referência da região"
-              value={atr} onChangeText={setAtr} keyboardType="numeric" placeholder="140" />
-            <Field label="Preço do ATR (R$/kg)" hint="CONSECANA da safra"
-              value={precoAtr} onChangeText={setPrecoAtr} keyboardType="numeric" placeholder="1,13" />
+                <Field label="ATR (kg/t)" hint="da usina, ou uma referência da região"
+                  value={atr} onChangeText={setAtr} keyboardType="numeric" placeholder="140" />
+                <Field label="Preço do ATR (R$/kg)" hint="CONSECANA da safra"
+                  value={precoAtr} onChangeText={setPrecoAtr} keyboardType="numeric" placeholder="1,13" />
 
-            <PillGroup label="Tipo de produtor (contrato)" optional
-              hint="Como a usina te remunera."
-              options={CONTRACT_TYPES} value={contractType} onChange={setContractType} />
-            <PillGroup label="Modalidade de entrega" optional
-              hint="Quem arca com o CTT (corte/transbordo/transporte)."
-              options={DELIVERY_MODALITIES} value={deliveryModality} onChange={setDeliveryModality} />
+                <PillGroup label="Tipo de produtor (contrato)" optional
+                  hint="Como a usina te remunera."
+                  options={CONTRACT_TYPES} value={contractType} onChange={setContractType} />
+                <PillGroup label="Modalidade de entrega" optional
+                  hint="Quem arca com o CTT (corte/transbordo/transporte)."
+                  options={DELIVERY_MODALITIES} value={deliveryModality} onChange={setDeliveryModality} />
+              </>
+            ) : (
+              <>
+                <Field label="Área cultivada (ha)"
+                  value={cultivatedArea} onChangeText={setCultivatedArea}
+                  keyboardType="numeric" placeholder="100" />
+                <Text style={styles.groupLabel}>Produção ({cropUnit})</Text>
+                <Field label={`Quantidade produzida (${cropUnit})`} hint="opcional — para o custo por unidade"
+                  value={productionQty} onChangeText={setProductionQty}
+                  keyboardType="numeric" placeholder="3500" />
+                <Text style={styles.derived}>
+                  Produção total: {totalProdDerived.toLocaleString('pt-BR')} {cropUnit}
+                </Text>
+                <Field label={`Preço de venda (R$/${cropUnit})`} hint="opcional — para receita e margem"
+                  value={salePrice} onChangeText={setSalePrice}
+                  keyboardType="numeric" placeholder="130" />
+              </>
+            )}
 
             {err ? <Text style={styles.err}>{err}</Text> : null}
 
@@ -318,12 +377,12 @@ export default function NovaSafra() {
             </Text>
 
             <View style={styles.itemForm}>
-              <Select label="Categoria" options={CATEGORIES} value={cat} onChange={changeCategory} />
+              <Select label="Categoria" options={categories} value={cat} onChange={changeCategory} />
               <Select
                 label="Subcategoria"
                 placeholder="Escolha o item de custo…"
                 hint="Lista fechada — ajuda a comparar com outros produtores depois."
-                options={subcategoriesFor(cat)}
+                options={subOptions}
                 value={sub}
                 onChange={setSub}
               />

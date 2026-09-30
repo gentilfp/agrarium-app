@@ -8,21 +8,25 @@ import { MetricCard } from '@/components/MetricCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useHarvest, type BenchmarkRow } from '@/lib/harvests-api';
+import { cropName, isSugarcane } from '@/lib/harvest';
 import { brl, colors, statusColor, type Status } from '@/lib/theme';
 
 const num = (x: number, d = 0) =>
   x.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-function fmtBench(row: BenchmarkRow): { value: string; ref: string } {
+function fmtBench(row: BenchmarkRow, unit: string): { value: string; ref: string } {
+  const ref = (v: number | null, f: (n: number) => string) => (v == null ? '—' : f(v));
   switch (row.format) {
     case 'brl':
-      return { value: brl(row.value, 0), ref: brl(row.ref, 0) };
+      return { value: brl(row.value, 0), ref: ref(row.ref, (n) => brl(n, 0)) };
     case 'brl4':
-      return { value: brl(row.value, 4), ref: brl(row.ref, 4) };
+      return { value: brl(row.value, 4), ref: ref(row.ref, (n) => brl(n, 4)) };
     case 't_ha':
-      return { value: `${num(row.value, 1)} t/ha`, ref: `${num(row.ref, 0)} t/ha` };
+      return { value: `${num(row.value, 1)} t/ha`, ref: ref(row.ref, (n) => `${num(n, 0)} t/ha`) };
     case 'kg_t':
-      return { value: `${num(row.value, 0)} kg/t`, ref: `${num(row.ref, 0)} kg/t` };
+      return { value: `${num(row.value, 0)} kg/t`, ref: ref(row.ref, (n) => `${num(n, 0)} kg/t`) };
+    case 'unit_ha':
+      return { value: `${num(row.value, 1)} ${unit}/ha`, ref: ref(row.ref, (n) => `${num(n, 0)} ${unit}/ha`) };
   }
 }
 
@@ -64,7 +68,10 @@ export default function Resultado() {
   }
 
   const { input, report: r } = data;
-  const margemColor = r.margin >= 0 ? colors.good : colors.danger;
+  const cane = isSugarcane(data.crop?.slug ?? input.crop_slug);
+  const cropLabel = cropName(data.crop?.slug ?? input.crop_slug);
+  const unit = r.production_unit ?? 't';
+  const margemColor = r.margin == null ? colors.muted : r.margin >= 0 ? colors.good : colors.danger;
   const kgAtrBench = r.sector_benchmark.find((b) => b.key === 'cost_per_kg_atr');
   const meta = r.reference_meta;
 
@@ -90,32 +97,55 @@ export default function Resultado() {
 
       {/* Cabeçalho da safra */}
       <Card>
-        <Text style={styles.safra}>Safra {input.crop_year}</Text>
-        <Text style={styles.meta}>
-          {num(input.plant_cane_area_ha ?? 0)} ha planta · {num(input.ratoon_area_ha ?? 0)} ha soca ·{' '}
-          {num(r.total_production_t)} t · {num(r.tch, 1)} t/ha · ATR {num(input.atr_kg_per_t ?? 0)} kg/t
+        <Text style={styles.safra}>
+          {cropLabel} · Safra {input.crop_year}
         </Text>
-        <Text style={styles.meta}>
-          {input.contract_type_label ?? 'Contrato não informado'} ·{' '}
-          {input.delivery_modality_label ?? 'Modalidade não informada'} · preço ATR{' '}
-          {brl(input.atr_price ?? 0, 2)}/kg
-        </Text>
+        {cane ? (
+          <>
+            <Text style={styles.meta}>
+              {num(input.plant_cane_area_ha ?? 0)} ha planta · {num(input.ratoon_area_ha ?? 0)} ha soca ·{' '}
+              {num(r.total_production_t)} t · {num(r.tch, 1)} t/ha · ATR {num(input.atr_kg_per_t ?? 0)} kg/t
+            </Text>
+            <Text style={styles.meta}>
+              {input.contract_type_label ?? 'Contrato não informado'} ·{' '}
+              {input.delivery_modality_label ?? 'Modalidade não informada'} · preço ATR{' '}
+              {brl(input.atr_price ?? 0, 2)}/kg
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.meta}>
+            {num(r.area_ha)} ha · {num(r.production_quantity)} {unit} · {num(r.tch, 1)} {unit}/ha
+            {input.sale_price != null ? ` · venda ${brl(input.sale_price, 2)}/${unit}` : ''}
+          </Text>
+        )}
       </Card>
 
       {/* Indicador-chave */}
       <Card style={styles.heroCard}>
-        <Text style={styles.heroLabel}>Custo por kg de ATR</Text>
-        <Text style={[styles.hero, { color: statusColor(kgAtrBench?.status) }]}>
-          {brl(r.cost_per_kg_atr, 4)}
-        </Text>
-        <Text style={styles.heroSub}>
-          Margem {brl(r.margin_per_kg_atr, 4)}/kg ATR
-          {kgAtrBench ? ` · referência ${brl(kgAtrBench.ref, 4)}` : ''}
-        </Text>
+        {cane ? (
+          <>
+            <Text style={styles.heroLabel}>Custo por kg de ATR</Text>
+            <Text style={[styles.hero, { color: statusColor(kgAtrBench?.status) }]}>
+              {brl(r.cost_per_kg_atr, 4)}
+            </Text>
+            <Text style={styles.heroSub}>
+              Margem {r.margin_per_kg_atr == null ? '—' : brl(r.margin_per_kg_atr, 4)}/kg ATR
+              {kgAtrBench ? ` · referência ${brl(kgAtrBench.ref ?? 0, 4)}` : ''}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.heroLabel}>Custo por {unit}</Text>
+            <Text style={styles.hero}>{brl(r.cost_per_unit)}</Text>
+            <Text style={styles.heroSub}>
+              {num(r.production_quantity)} {unit} em {num(r.area_ha)} ha
+            </Text>
+          </>
+        )}
       </Card>
 
       <View style={styles.metricRow}>
-        <MetricCard label="Custo / t" value={brl(r.cost_per_t)} />
+        <MetricCard label={cane ? 'Custo / t' : `Custo / ${unit}`} value={brl(r.cost_per_unit)} />
         <MetricCard label="Custo / ha" value={brl(r.cost_per_ha)} />
       </View>
 
@@ -124,15 +154,28 @@ export default function Resultado() {
         <View style={styles.finRow}>
           <View style={styles.finCell}>
             <Text style={styles.finLabel}>Receita</Text>
-            <Text style={styles.finValue}>{brl(r.revenue)}</Text>
+            <Text style={styles.finValue}>{r.revenue == null ? '—' : brl(r.revenue)}</Text>
           </View>
           <View style={styles.finCell}>
             <Text style={styles.finLabel}>Margem</Text>
-            <Text style={[styles.finValue, { color: margemColor }]}>{brl(r.margin)}</Text>
+            <Text style={[styles.finValue, { color: margemColor }]}>
+              {r.margin == null ? '—' : brl(r.margin)}
+            </Text>
           </View>
           <View style={styles.finCell}>
-            <Text style={styles.finLabel}>Equilíbrio</Text>
-            <Text style={styles.finValue}>{num(r.break_even_tch, 1)} t/ha</Text>
+            {cane && r.break_even_tch != null ? (
+              <>
+                <Text style={styles.finLabel}>Equilíbrio</Text>
+                <Text style={styles.finValue}>{num(r.break_even_tch, 1)} t/ha</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.finLabel}>Margem/{unit}</Text>
+                <Text style={styles.finValue}>
+                  {r.margin_per_unit == null ? '—' : brl(r.margin_per_unit)}
+                </Text>
+              </>
+            )}
           </View>
         </View>
       </Card>
@@ -158,7 +201,9 @@ export default function Resultado() {
           </>
         ) : (
           <Text style={styles.compareIntro}>
-            Lance os insumos de tratos da soca (NPK, defensivos, herbicidas…) para comparar com a base.
+            {cane
+              ? 'Lance os insumos de tratos da soca (NPK, defensivos, herbicidas…) para comparar com a base.'
+              : 'Sem dados de comparação para esta cultura ainda — seus lançamentos viram a referência.'}
           </Text>
         )}
       </Card>
@@ -219,10 +264,16 @@ export default function Resultado() {
       {/* Referência do setor */}
       <Text style={styles.h2}>Referência do setor</Text>
       <Card>
-        {r.sector_benchmark.map((row) => {
-          const f = fmtBench(row);
-          return <BenchRow key={row.key} label={row.label} value={f.value} ref={f.ref} status={row.status} />;
-        })}
+        {r.sector_benchmark.length > 0 ? (
+          r.sector_benchmark.map((row) => {
+            const f = fmtBench(row, unit);
+            return <BenchRow key={row.key} label={row.label} value={f.value} ref={f.ref} status={row.status} />;
+          })
+        ) : (
+          <Text style={styles.compareIntro}>
+            Sem referência do setor para {cropLabel} ainda — valendo-se dos seus próprios números.
+          </Text>
+        )}
       </Card>
 
       {/* Recomendações */}
@@ -243,11 +294,22 @@ export default function Resultado() {
       {showMethod ? (
         <Card>
           <Text style={styles.methodText}>
-            Custo/t = custo total ÷ produção (t){'\n'}
-            Custo/ha = custo total ÷ área colhida (planta + soca){'\n'}
-            Custo/kg ATR = custo total ÷ (ATR × produção){'\n'}
-            Receita = preço do ATR × ATR × produção{'\n'}
-            Margem = receita − custo total
+            {cane ? (
+              <>
+                Custo/t = custo total ÷ produção (t){'\n'}
+                Custo/ha = custo total ÷ área colhida (planta + soca){'\n'}
+                Custo/kg ATR = custo total ÷ (ATR × produção){'\n'}
+                Receita = preço do ATR × ATR × produção{'\n'}
+                Margem = receita − custo total
+              </>
+            ) : (
+              <>
+                Custo/{unit} = custo total ÷ produção ({unit}){'\n'}
+                Custo/ha = custo total ÷ área cultivada{'\n'}
+                Receita = preço de venda × produção{'\n'}
+                Margem = receita − custo total
+              </>
+            )}
           </Text>
           <Text style={styles.methodSource}>
             Comparação por insumo: mediana R$/ha da base viva ({meta.n} produtores, {meta.region}),
