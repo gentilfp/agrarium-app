@@ -28,6 +28,8 @@ export type FiscalDocumentDTO = {
   inbox_status: string;
   deadline_soon: boolean;
   actions_allowed: boolean;
+  // Backend reason when actions_allowed is false (cancelled, no identity, live gate).
+  actions_refusal: string | null;
 };
 
 export type FiscalManifestationDTO = {
@@ -51,6 +53,7 @@ export type FiscalIdentityDTO = {
   connection_status: string;
   last_synced_at: string | null;
   last_sync_error: string | null;
+  is_demo: boolean;
 };
 
 export const INBOX_STATUSES = [
@@ -78,6 +81,9 @@ const INBOX_LABELS: Record<string, string> = {
 export function inboxLabel(status: string): string {
   return INBOX_LABELS[status] ?? status;
 }
+
+// AGR-4 milestone wording for every simulated (demo) fiscal surface.
+export const SIMULATED_FISCAL_BANNER = 'Integração fiscal simulada — nenhuma operação enviada à SEFAZ';
 
 export type InboxFilters = {
   inbox_status?: string;
@@ -194,6 +200,37 @@ export const AGRONOMIC_CATEGORIES = [
   'other',
 ] as const;
 
+const CATEGORY_LABELS: Record<string, string> = {
+  nitrogen_fertilizer: 'Fertilizante nitrogenado',
+  phosphate_fertilizer: 'Fertilizante fosfatado',
+  potassium_fertilizer: 'Fertilizante potássico',
+  npk_fertilizer: 'Fertilizante NPK',
+  liming_corrective: 'Calcário / corretivo',
+  herbicide: 'Herbicida',
+  fungicide: 'Fungicida',
+  insecticide: 'Inseticida',
+  seed: 'Sementes / mudas',
+  adjuvant: 'Adjuvante',
+  fuel: 'Combustível',
+  other: 'Outros',
+  [UNCLASSIFIED_BUCKET]: 'Sem classificação',
+};
+
+export function categoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] ?? category;
+}
+
+// Document statuses that keep a note out of the purchase report.
+const EXCLUDED_STATUS_LABELS: Record<string, string> = {
+  received: 'aguardando processamento',
+  failed: 'com falha',
+  cancelled: 'canceladas',
+};
+
+export function excludedStatusLabel(status: string): string {
+  return EXCLUDED_STATUS_LABELS[status] ?? status;
+}
+
 export function useFiscalDocuments(demo = false) {
   return useQuery({
     queryKey: ['fiscal-documents', demo],
@@ -308,11 +345,20 @@ export function useProductSearch(query: string, demo = false) {
 export function useUploadFiscalDocuments() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (form: FormData) =>
-      (await api.post<{ results: UploadResult[] }>('/fiscal_documents', form)).data,
+    // demo: uploads join the demo set (never live aggregates).
+    mutationFn: async ({ form, demo = false }: { form: FormData; demo?: boolean }) =>
+      (
+        await api.post<{ results: UploadResult[] }>('/fiscal_documents', form, {
+          params: demo ? { demo: 'true' } : {},
+        })
+      ).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fiscal-documents'] });
+      qc.invalidateQueries({ queryKey: ['fiscal-inbox'] });
+      qc.invalidateQueries({ queryKey: ['fiscal-identities'] });
       qc.invalidateQueries({ queryKey: ['review-items'] });
+      qc.invalidateQueries({ queryKey: ['purchase-report'] });
+      qc.invalidateQueries({ queryKey: ['purchase-items'] });
     },
   });
 }

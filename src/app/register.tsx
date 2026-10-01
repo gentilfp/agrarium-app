@@ -14,7 +14,7 @@ import { colors } from '@/lib/theme';
 const schema = z.object({
   name: z.string().min(2, 'Informe seu nome'),
   email: z.string().email('E-mail inválido'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
+  password: z.string().min(8, 'Mínimo 8 caracteres'),
   phone: z.string().optional(),
   birth_date: z.string().optional(),
   city: z.string().optional(),
@@ -78,7 +78,7 @@ export default function Register() {
         <CField control={control} name="email" label="E-mail" error={errors.email?.message}
           autoCapitalize="none" keyboardType="email-address" placeholder="voce@fazenda.com.br" />
         <CField control={control} name="password" label="Senha" error={errors.password?.message}
-          secureTextEntry placeholder="mínimo 6 caracteres" />
+          secureTextEntry placeholder="mínimo 8 caracteres" />
         <CField control={control} name="phone" label="Telefone" keyboardType="phone-pad" placeholder="(00) 00000-0000" />
         <CField control={control} name="birth_date" label="Data de nascimento" hint="formato AAAA-MM-DD" placeholder="1985-04-20" />
         <CField control={control} name="city" label="Cidade" placeholder="Orlândia" />

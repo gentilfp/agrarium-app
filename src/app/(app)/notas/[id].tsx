@@ -16,6 +16,7 @@ import {
   apiError,
   inboxLabel,
   lineValue,
+  SIMULATED_FISCAL_BANNER,
   useFiscalDocument,
   useManifestDocument,
 } from '@/lib/fiscal-api';
@@ -179,7 +180,12 @@ export default function NotaDetalhe() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>{doc.emitter_name ?? 'Documento'}</Text>
-        {doc.is_demo ? <Text style={styles.demoBadge}>Dados de demonstração</Text> : null}
+        {doc.is_demo ? (
+          <>
+            <Text style={styles.demoBadge}>Dados de demonstração</Text>
+            <Text style={styles.demoBadge}>{SIMULATED_FISCAL_BANNER}</Text>
+          </>
+        ) : null}
         <Text style={styles.meta}>
           Chave {doc.chave}
           {doc.issued_at ? ` · Emitida em ${new Date(doc.issued_at).toLocaleDateString('pt-BR')}` : ''}
@@ -240,12 +246,7 @@ export default function NotaDetalhe() {
             ))}
           </>
         ) : (
-          <Text style={styles.itemMeta}>
-            Este documento não aceita resposta pelo app
-            {doc.source === 'manual_upload' && doc.fiscal_identity_id == null
-              ? ' (XML avulso sem identidade fiscal conectada).'
-              : ' (integração ao vivo ainda não habilitada).'}
-          </Text>
+          <Text style={styles.itemMeta}>{sentence(doc.actions_refusal ?? 'este documento não aceita resposta pelo app')}</Text>
         )}
         {result ? (
           <Text style={result.refusal ? styles.errorText : styles.okText}>{result.text}</Text>
@@ -338,6 +339,11 @@ function xmlLabel(status: string) {
   if (status === 'pending') return 'buscando XML';
   if (status === 'failed') return 'falha no XML';
   return 'XML indisponível';
+}
+
+// Backend refusal reasons are lower-case API messages.
+function sentence(text: string) {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
 }
 
 const styles = StyleSheet.create({

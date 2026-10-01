@@ -18,6 +18,8 @@ import {
   AGRONOMIC_CATEGORIES,
   UNCLASSIFIED_BUCKET,
   apiError,
+  categoryLabel,
+  excludedStatusLabel,
   lineValue,
   usePurchaseItems,
   usePurchaseReport,
@@ -28,13 +30,8 @@ import { brl, colors } from '@/lib/theme';
 const EMPTY_FILTERS: PurchaseFilters = {};
 const CATEGORY_OPTIONS = [
   { key: '', label: 'Todas as categorias' },
-  ...AGRONOMIC_CATEGORIES.map((key) => ({ key, label: key })),
-  { key: UNCLASSIFIED_BUCKET, label: 'Sem classificação' },
+  ...[...AGRONOMIC_CATEGORIES, UNCLASSIFIED_BUCKET].map((key) => ({ key, label: categoryLabel(key) })),
 ] as { key: string; label: string }[];
-
-function categoryLabel(category: string) {
-  return category === UNCLASSIFIED_BUCKET ? 'Sem classificação' : category;
-}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -268,7 +265,7 @@ export default function Relatorio() {
                 {excluded.length > 0 ? (
                   <Text style={styles.note}>
                     Excluídos do total:{' '}
-                    {excluded.map(([status, n]) => `${n} ${status}`).join(', ')}.
+                    {excluded.map(([status, n]) => `${n} ${excludedStatusLabel(status)}`).join(', ')}.
                   </Text>
                 ) : null}
                 <Text style={styles.note}>

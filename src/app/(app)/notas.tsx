@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/Card';
 import {
   apiError,
   inboxLabel,
+  SIMULATED_FISCAL_BANNER,
   useFiscalIdentities,
   useInboxDocuments,
   useUploadFiscalDocuments,
@@ -72,7 +73,7 @@ export default function Notas() {
     }
 
     try {
-      const payload = await upload.mutateAsync(form);
+      const payload = await upload.mutateAsync({ form, demo });
       setResults(payload.results);
       refetch();
     } catch (err) {
@@ -96,7 +97,10 @@ export default function Notas() {
           <Switch value={demo} onValueChange={setDemo} accessibilityLabel="Dados de demonstração" />
         </View>
         {demo ? (
-          <Text style={styles.demoBadge}>Mostrando apenas registros de demonstração</Text>
+          <>
+            <Text style={styles.demoBadge}>Mostrando apenas registros de demonstração</Text>
+            <Text style={styles.demoBadge}>{SIMULATED_FISCAL_BANNER}</Text>
+          </>
         ) : null}
 
         <Card style={styles.syncCard}>
@@ -104,6 +108,7 @@ export default function Notas() {
           {sync ? (
             <Text style={styles.syncText}>
               {sync.connection_status === 'active' ? '● Sincronizado' : `● ${sync.connection_status}`}
+              {sync.is_demo ? ' (simulado)' : ''}
               {sync.last_synced_at
                 ? ` · última sync ${new Date(sync.last_synced_at).toLocaleString('pt-BR')}`
                 : ' · nunca sincronizado'}
@@ -171,6 +176,9 @@ export default function Notas() {
         )}
 
         <Text style={styles.h2}>Enviar XML manualmente</Text>
+        {demo ? (
+          <Text style={styles.demoBadge}>Os XMLs enviados entram nos dados de demonstração.</Text>
+        ) : null}
         <Button title="Escolher XMLs e enviar" onPress={pickAndUpload} loading={upload.isPending} />
         <View style={{ marginTop: 12 }}>
           <Button

@@ -16,6 +16,7 @@ import { Field } from '@/components/ui/Field';
 import { Select } from '@/components/ui/Select';
 import {
   AGRONOMIC_CATEGORIES,
+  categoryLabel,
   apiError,
   useCorrectItem,
   useCreateProduct,
@@ -25,7 +26,7 @@ import {
 } from '@/lib/fiscal-api';
 import { brl, colors } from '@/lib/theme';
 
-const CATEGORY_OPTIONS = AGRONOMIC_CATEGORIES.map((key) => ({ key, label: key }));
+const CATEGORY_OPTIONS = AGRONOMIC_CATEGORIES.map((key) => ({ key, label: categoryLabel(key) }));
 
 function ReviewCard({ item }: { item: FiscalItemDTO }) {
   const correct = useCorrectItem();
