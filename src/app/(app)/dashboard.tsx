@@ -69,6 +69,9 @@ export default function Dashboard() {
             <Button title="Revisar compras" variant="outline" onPress={() => router.push('/revisao')} />
           </View>
         </View>
+        <View style={styles.cta}>
+          <Button title="Relatório de compras" variant="outline" onPress={() => router.push('/relatorio')} />
+        </View>
 
         {isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />

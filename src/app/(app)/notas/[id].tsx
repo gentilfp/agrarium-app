@@ -1,18 +1,35 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { useFiscalDocument } from '@/lib/fiscal-api';
+import { apiError, lineValue, useFiscalDocument } from '@/lib/fiscal-api';
 import { brl, colors } from '@/lib/theme';
 
 export default function NotaDetalhe() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: doc, isLoading } = useFiscalDocument(id);
+  const { id, demo } = useLocalSearchParams<{ id: string; demo?: string }>();
+  const { data: doc, isLoading, isError, error, refetch } = useFiscalDocument(id, demo === 'true');
 
-  if (isLoading || !doc) {
+  if (isLoading) {
     return (
       <View style={styles.screen}>
         <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
+      </View>
+    );
+  }
+
+  if (isError || !doc) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.container}>
+          <Card style={styles.errorCard}>
+            <Text style={styles.errorText}>
+              {apiError(error, 'Documento não encontrado.')}
+            </Text>
+            <Button title="Tentar de novo" onPress={() => refetch()} />
+            <Button title="Voltar" variant="outline" onPress={() => router.back()} />
+          </Card>
+        </View>
       </View>
     );
   }
@@ -36,6 +53,10 @@ export default function NotaDetalhe() {
         {doc.items.map((item) => (
           <Card key={item.id}>
             <Text style={styles.itemDesc}>{item.description}</Text>
+            <Text style={styles.itemMeta}>
+              Valor: {brl(lineValue(item) ?? undefined)}
+              {item.discount ? ` (desc. ${brl(item.discount)})` : ''}
+            </Text>
             <Text style={styles.itemMeta}>
               {item.commercial_quantity ?? '?'} {item.commercial_unit ?? ''}
               {item.normalized_quantity != null && item.base_unit
@@ -68,4 +89,6 @@ const styles = StyleSheet.create({
   h2: { fontSize: 16, fontWeight: '800', color: colors.text, marginTop: 20, marginBottom: 10 },
   itemDesc: { fontSize: 15, fontWeight: '700', color: colors.text },
   itemMeta: { fontSize: 13, color: colors.muted, marginTop: 4, lineHeight: 18 },
+  errorCard: { marginTop: 24, gap: 12 },
+  errorText: { fontSize: 14, color: colors.danger, lineHeight: 20 },
 });

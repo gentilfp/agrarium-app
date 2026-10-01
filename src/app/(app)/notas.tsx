@@ -68,6 +68,13 @@ export default function Notas() {
         </Text>
 
         <Button title="Escolher XMLs e enviar" onPress={pickAndUpload} loading={upload.isPending} />
+        <View style={{ marginTop: 12 }}>
+          <Button
+            title="Ver relatório de compras"
+            variant="outline"
+            onPress={() => router.push('/relatorio')}
+          />
+        </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {results ? (
