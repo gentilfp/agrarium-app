@@ -20,6 +20,9 @@ export default function AppLayout() {
       <Stack.Screen name="dashboard" options={{ title: 'Agrarium' }} />
       <Stack.Screen name="nova-safra" options={{ title: 'Nova safra' }} />
       <Stack.Screen name="resultado" options={{ title: 'Relatório' }} />
+      <Stack.Screen name="notas" options={{ title: 'Notas fiscais' }} />
+      <Stack.Screen name="notas/[id]" options={{ title: 'Documento' }} />
+      <Stack.Screen name="revisao" options={{ title: 'Revisar compras' }} />
     </Stack>
   );
 }

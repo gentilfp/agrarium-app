@@ -61,6 +61,14 @@ export default function Dashboard() {
         <View style={styles.cta}>
           <Button title="Lançar nova safra" onPress={() => router.push('/nova-safra')} />
         </View>
+        <View style={styles.ctaRow}>
+          <View style={styles.ctaHalf}>
+            <Button title="Notas fiscais" variant="outline" onPress={() => router.push('/notas')} />
+          </View>
+          <View style={styles.ctaHalf}>
+            <Button title="Revisar compras" variant="outline" onPress={() => router.push('/revisao')} />
+          </View>
+        </View>
 
         {isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />
@@ -115,7 +123,9 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 40, maxWidth: 520, width: '100%', alignSelf: 'center' },
   title: { fontSize: 24, fontWeight: '800', color: colors.text },
   sub: { fontSize: 15, color: colors.muted, marginTop: 8, lineHeight: 21 },
-  cta: { marginTop: 20, marginBottom: 24 },
+  cta: { marginTop: 20 },
+  ctaRow: { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 24 },
+  ctaHalf: { flex: 1 },
   h2: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 10 },
   groupTitle: { fontSize: 14, fontWeight: '700', color: colors.muted, marginTop: 6, marginBottom: 2 },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },

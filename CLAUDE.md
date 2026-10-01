@@ -37,11 +37,15 @@ src/
 │  ├─ register.tsx         # sign up
 │  └─ (app)/
 │     ├─ _layout.tsx       # protected group (auth guard)
-│     ├─ dashboard.tsx     # list of analyzed safras (useHarvests)
+│     ├─ dashboard.tsx     # list of analyzed safras (useHarvests) + links to notas/revisão
 │     ├─ nova-safra.tsx    # safra wizard (dados + custos) → POST /harvests
-│     └─ resultado.tsx     # server report (useHarvest)
+│     ├─ resultado.tsx     # server report (useHarvest)
+│     ├─ notas.tsx          # AGR-6: NF-e XML upload (DocumentPicker, web+native) + doc list
+│     ├─ notas/[id].tsx     # AGR-6: document detail with items (AGR-5 extends the inbox here)
+│     └─ revisao.tsx        # AGR-6: review queue (product search/create + correction)
 ├─ lib/
 │  ├─ api.ts               # axios + Bearer-token interceptor (EXPO_PUBLIC_API_URL)
+│  ├─ fiscal-api.ts         # AGR-6: fiscal DTOs + React Query hooks (upload, review, correct)
 │  ├─ auth.tsx             # AuthContext (signIn/signUp/signOut, /me on boot)
 │  ├─ harvest.ts           # form taxonomy + display helpers (NO calc — backend owns it)
 │  ├─ harvests-api.ts      # React Query hooks + API DTO types
