@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -147,7 +156,9 @@ function ReviewCard({ item }: { item: FiscalItemDTO }) {
 }
 
 export default function Revisao() {
-  const { data: items, isLoading, refetch } = useReviewItems();
+  const { demo: demoParam } = useLocalSearchParams<{ demo?: string }>();
+  const [demo, setDemo] = useState(demoParam === 'true');
+  const { data: items, isLoading, refetch } = useReviewItems(demo);
 
   return (
     <View style={styles.screen}>
@@ -157,6 +168,10 @@ export default function Revisao() {
           Itens que o classificador não reconheceu com segurança. Ao corrigir, o Agrarium aprende e
           atualiza os iguais.
         </Text>
+        <View style={styles.demoRow}>
+          <Text style={styles.demoText}>Dados de demonstração</Text>
+          <Switch value={demo} onValueChange={setDemo} accessibilityLabel="Dados de demonstração" />
+        </View>
         {isLoading ? (
           <ActivityIndicator color={colors.primary} />
         ) : items && items.length > 0 ? (
@@ -188,6 +203,8 @@ const styles = StyleSheet.create({
   itemDesc: { fontSize: 15, fontWeight: '700', color: colors.text },
   itemMeta: { fontSize: 13, color: colors.muted, marginTop: 4, lineHeight: 18 },
   demoBadge: { fontSize: 12, fontWeight: '700', color: colors.primaryDark, marginTop: 4 },
+  demoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  demoText: { fontSize: 14, fontWeight: '600', color: colors.text },
   option: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
   optionActive: { backgroundColor: colors.primaryLight },
   optionText: { fontSize: 15, color: colors.text },

@@ -40,8 +40,8 @@ src/
 │     ├─ dashboard.tsx     # list of analyzed safras (useHarvests) + links to notas/revisão
 │     ├─ nova-safra.tsx    # safra wizard (dados + custos) → POST /harvests
 │     ├─ resultado.tsx     # server report (useHarvest)
-│     ├─ notas.tsx          # AGR-6: NF-e XML upload (DocumentPicker, web+native) + doc list
-│     ├─ notas/[id].tsx     # AGR-6: document detail with items (AGR-5 extends the inbox here)
+│     ├─ notas.tsx          # AGR-5: fiscal inbox (status filter + counts + sync + upload)
+│     ├─ notas/[id].tsx     # AGR-5: detail with manifestation timeline + response modals
 │     └─ revisao.tsx        # AGR-6: review queue (product search/create + correction)
 ├─ lib/
 │  ├─ api.ts               # axios + Bearer-token interceptor (EXPO_PUBLIC_API_URL)

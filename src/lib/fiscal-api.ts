@@ -20,6 +20,70 @@ export type FiscalDocumentDTO = {
   is_demo: boolean;
   items_count: number;
   needs_review_count: number;
+  // AGR-5: backend-derived inbox state (the app never computes it).
+  fiscal_identity_id: number | null;
+  xml_status: string;
+  manifestation_deadline: string | null;
+  sync_error: string | null;
+  inbox_status: string;
+  deadline_soon: boolean;
+  actions_allowed: boolean;
+};
+
+export type FiscalManifestationDTO = {
+  id: number;
+  event_type: string;
+  justification: string | null;
+  status: string;
+  provider_protocol: string | null;
+  sefaz_protocol: string | null;
+  error: string | null;
+  is_demo: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FiscalIdentityDTO = {
+  id: number;
+  document_type: string;
+  document_number: string;
+  name: string | null;
+  connection_status: string;
+  last_synced_at: string | null;
+  last_sync_error: string | null;
+};
+
+export const INBOX_STATUSES = [
+  'needs_response',
+  'awaiting_xml',
+  'processing',
+  'needs_review',
+  'processed',
+  'disputed',
+  'failed',
+  'cancelled',
+] as const;
+
+const INBOX_LABELS: Record<string, string> = {
+  needs_response: 'Responder',
+  awaiting_xml: 'Aguard. XML',
+  processing: 'Processando',
+  needs_review: 'Revisar',
+  processed: 'Processada',
+  disputed: 'Contestada',
+  failed: 'Falhou',
+  cancelled: 'Cancelada',
+};
+
+export function inboxLabel(status: string): string {
+  return INBOX_LABELS[status] ?? status;
+}
+
+export type InboxFilters = {
+  inbox_status?: string;
+  issuer?: string;
+  date_from?: string;
+  date_to?: string;
 };
 
 export type FiscalItemDTO = {
@@ -49,7 +113,10 @@ export type FiscalItemDTO = {
   is_demo: boolean;
 };
 
-export type FiscalDocumentDetail = FiscalDocumentDTO & { items: FiscalItemDTO[] };
+export type FiscalDocumentDetail = FiscalDocumentDTO & {
+  items: FiscalItemDTO[];
+  manifestations: FiscalManifestationDTO[];
+};
 
 export type ProductDTO = {
   id: number;
@@ -133,6 +200,75 @@ export function useFiscalDocuments(demo = false) {
     queryFn: async () =>
       (await api.get<FiscalDocumentDTO[]>('/fiscal_documents', { params: demo ? { demo: 'true' } : {} }))
         .data,
+  });
+}
+
+// AGR-5: inbox list with backend-derived status, per-status counts (from the
+// X-Inbox-Counts response header) and connection/sync status.
+export function useInboxDocuments(filters: InboxFilters, demo = false) {
+  return useQuery({
+    queryKey: ['fiscal-inbox', filters, demo],
+    queryFn: async () => {
+      const res = await api.get<FiscalDocumentDTO[]>('/fiscal_documents', {
+        params: cleanParams({ ...filters, ...(demo ? { demo: 'true' } : {}) }),
+      });
+      let counts: Record<string, number> = {};
+      const raw = res.headers['x-inbox-counts'];
+      if (raw) {
+        try {
+          counts = JSON.parse(raw);
+        } catch {
+          counts = {};
+        }
+      }
+      const filteredTotal = Number(res.headers['x-total-count'] ?? res.data.length);
+      // "Todas" must mean every status in the current (non-status) filter
+      // context, like the per-status chips do — X-Total-Count is post status
+      // filter, which would relabel it to the filtered count.
+      const total =
+        Object.values(counts).reduce((sum, n) => sum + Number(n), 0) || filteredTotal;
+      return { documents: res.data, counts, total };
+    },
+  });
+}
+
+export function useFiscalIdentities(demo = false) {
+  return useQuery({
+    queryKey: ['fiscal-identities', demo],
+    queryFn: async () =>
+      (
+        await api.get<FiscalIdentityDTO[]>('/fiscal_identities', {
+          params: demo ? { demo: 'true' } : {},
+        })
+      ).data,
+  });
+}
+
+export function useManifestDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      event_type,
+      justification,
+      demo,
+    }: {
+      id: number;
+      event_type: string;
+      justification?: string;
+      demo?: boolean;
+    }) =>
+      (
+        await api.post<{ manifestation: FiscalManifestationDTO; already_submitted: boolean; inbox_status: string }>(
+          `/fiscal_documents/${id}/manifestations`,
+          { event_type, justification },
+          { params: demo ? { demo: 'true' } : {} },
+        )
+      ).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fiscal-inbox'] });
+      qc.invalidateQueries({ queryKey: ['fiscal-documents'] });
+    },
   });
 }
 
