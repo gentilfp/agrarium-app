@@ -3,14 +3,12 @@
 // chegam prontos via API (ver `harvests-api.ts`). Aqui ficam só a taxonomia (lista
 // fechada para o formulário) e os helpers de exibição.
 
-// ── Culturas (espelham a tabela `crops` do backend) ──────────────────────────
-export type CropSlug = 'cana-de-acucar' | 'soja' | 'milho' | 'cafe';
+// ── Cultura (espelha a tabela `crops` do backend) ────────────────────────────
+// O Agrarium é EXCLUSIVAMENTE sobre cana-de-açúcar: não há outras culturas.
+export type CropSlug = 'cana-de-acucar';
 
 export const CROPS: { slug: CropSlug; name: string; unit: string }[] = [
   { slug: 'cana-de-acucar', name: 'Cana-de-açúcar', unit: 't' },
-  { slug: 'soja', name: 'Soja', unit: 'sc' },
-  { slug: 'milho', name: 'Milho', unit: 'sc' },
-  { slug: 'cafe', name: 'Café', unit: 'sc' },
 ];
 
 export const isSugarcane = (slug?: CropSlug | string | null) => slug === 'cana-de-acucar';

@@ -296,8 +296,10 @@ export default function NovaSafra() {
         {step === 0 ? (
           <>
             <Text style={styles.h1}>Dados da safra</Text>
-            <PillGroup label="Cultura" options={CROPS.map((c) => ({ key: c.slug, label: c.name }))}
-              value={crop} onChange={(c) => c && changeCrop(c)} />
+            {CROPS.length > 1 ? (
+              <PillGroup label="Cultura" options={CROPS.map((c) => ({ key: c.slug, label: c.name }))}
+                value={crop} onChange={(c) => c && changeCrop(c)} />
+            ) : null}
             <Field label="Safra" value={cropYear} onChangeText={setCropYear} placeholder="2025/26" />
 
             {cane ? (

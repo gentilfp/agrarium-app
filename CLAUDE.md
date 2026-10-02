@@ -12,6 +12,13 @@ live base, and sector benchmark. All calc lives in the backend; the app reads it
 
 > Product context lives in `../app.md` and `../knowledge.md` (root of the parent repo).
 
+## Sugarcane only — hard rule
+Agrarium is **EXCLUSIVELY about sugarcane (cana-de-açúcar)**. Never add, seed, mock or demo
+any other crop (soja, milho, café, etc.): no crop pickers, example data, invoices, harvests,
+catalog products or screenshots for other crops. `CROPS` in `lib/harvest.ts` holds sugarcane
+only. Cane is bought as mudas (planting material), not "sementes". If a task seems to need
+another crop, stop and ask first. The backend follows the same rule (`Crop::DEFAULT_CROPS`).
+
 ## Stack
 - Expo SDK 56 · Expo Router (typed routes) · TypeScript · `src/` layout.
 - **React Query** · **axios** · **react-hook-form + zod** · **expo-secure-store**.
