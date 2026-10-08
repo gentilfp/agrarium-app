@@ -143,6 +143,19 @@ export type UploadResult = {
   error?: string;
 };
 
+export type ManualPurchaseInput = {
+  supplier_name: string;
+  supplier_document?: string;
+  issued_at: string;
+  items: {
+    description: string;
+    agronomic_category: string;
+    quantity: string;
+    unit: 'kg' | 'L' | 'UN';
+    value: string;
+  }[];
+};
+
 export type PurchaseFilters = {
   date_from?: string;
   date_to?: string;
@@ -356,6 +369,21 @@ export function useUploadFiscalDocuments() {
       qc.invalidateQueries({ queryKey: ['fiscal-documents'] });
       qc.invalidateQueries({ queryKey: ['fiscal-inbox'] });
       qc.invalidateQueries({ queryKey: ['fiscal-identities'] });
+      qc.invalidateQueries({ queryKey: ['review-items'] });
+      qc.invalidateQueries({ queryKey: ['purchase-report'] });
+      qc.invalidateQueries({ queryKey: ['purchase-items'] });
+    },
+  });
+}
+
+export function useCreateManualFiscalDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ManualPurchaseInput) =>
+      (await api.post<FiscalDocumentDTO>('/fiscal_documents/manual', { manual_purchase: input })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fiscal-documents'] });
+      qc.invalidateQueries({ queryKey: ['fiscal-inbox'] });
       qc.invalidateQueries({ queryKey: ['review-items'] });
       qc.invalidateQueries({ queryKey: ['purchase-report'] });
       qc.invalidateQueries({ queryKey: ['purchase-items'] });

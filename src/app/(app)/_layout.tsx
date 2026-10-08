@@ -21,6 +21,7 @@ export default function AppLayout() {
       <Stack.Screen name="nova-safra" options={{ title: 'Nova safra' }} />
       <Stack.Screen name="resultado" options={{ title: 'Relatório' }} />
       <Stack.Screen name="notas" options={{ title: 'Notas fiscais' }} />
+      <Stack.Screen name="nota-manual" options={{ title: 'Adicionar compra' }} />
       <Stack.Screen name="notas/[id]" options={{ title: 'Documento' }} />
       <Stack.Screen name="relatorio" options={{ title: 'Relatório de compras' }} />
       <Stack.Screen name="revisao" options={{ title: 'Revisar compras' }} />

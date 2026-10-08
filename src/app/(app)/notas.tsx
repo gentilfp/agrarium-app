@@ -170,10 +170,16 @@ export default function Notas() {
         ) : (
           <Card style={styles.emptyCard}>
             <Text style={styles.emptyText}>
-              Nenhum documento neste filtro. Puxe para atualizar ou envie um XML abaixo.
+              Nenhum documento neste filtro. Puxe para atualizar ou adicione uma compra abaixo.
             </Text>
           </Card>
         )}
+
+        <Text style={styles.h2}>Adicionar sem XML</Text>
+        <Button
+          title="Adicionar compra manualmente"
+          onPress={() => router.push('/nota-manual')}
+        />
 
         <Text style={styles.h2}>Enviar XML manualmente</Text>
         {demo ? (

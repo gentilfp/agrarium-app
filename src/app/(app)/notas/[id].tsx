@@ -176,6 +176,8 @@ export default function NotaDetalhe() {
     );
   }
 
+  const isManual = doc.source === 'manual_entry';
+
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -187,22 +189,29 @@ export default function NotaDetalhe() {
           </>
         ) : null}
         <Text style={styles.meta}>
-          Chave {doc.chave}
+          {isManual ? 'Lançamento manual' : `Chave ${doc.chave}`}
           {doc.issued_at ? ` · Emitida em ${new Date(doc.issued_at).toLocaleDateString('pt-BR')}` : ''}
         </Text>
         <Text style={styles.meta}>
           {doc.nat_op ?? ''}
           {doc.total_vnf != null ? ` · Total ${brl(doc.total_vnf)}` : ''}
-          {doc.protocol_number ? ` · Protocolo ${doc.protocol_number}` : ' · Sem protocolo'}
+          {!isManual
+            ? doc.protocol_number
+              ? ` · Protocolo ${doc.protocol_number}`
+              : ' · Sem protocolo'
+            : ''}
         </Text>
         <Text style={styles.statusLine}>
-          Situação: {inboxLabel(doc.inbox_status)} · XML: {xmlLabel(doc.xml_status)}
+          Situação: {inboxLabel(doc.inbox_status)}
+          {!isManual ? ` · XML: ${xmlLabel(doc.xml_status)}` : ' · Compra informada sem XML'}
           {doc.manifestation_deadline
             ? ` · Prazo de resposta: ${new Date(doc.manifestation_deadline).toLocaleDateString('pt-BR')}${doc.deadline_soon ? ' (próximo!)' : ''}`
             : ''}
         </Text>
         {doc.sync_error ? <Text style={styles.errorText}>⚠ {doc.sync_error}</Text> : null}
 
+        {!isManual ? (
+          <>
         <Text style={styles.h2}>Histórico</Text>
         {doc.manifestations.length > 0 ? (
           doc.manifestations.map((m) => (
@@ -255,6 +264,8 @@ export default function NotaDetalhe() {
           <Text style={styles.demoBadge}>Resposta simulada — não enviada à SEFAZ</Text>
         ) : null}
         {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+          </>
+        ) : null}
 
         <Text style={styles.h2}>Itens ({doc.items.length})</Text>
         {doc.items.map((item) => (
