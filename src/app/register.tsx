@@ -61,7 +61,7 @@ export default function Register() {
         state: data.state || undefined,
         property_size_ha: data.property_size_ha ? Number(data.property_size_ha) : undefined,
       });
-      router.replace('/dashboard');
+      router.replace('/inicio');
     } catch (e) {
       setErr(apiError(e, 'Não foi possível criar a conta.'));
     } finally {

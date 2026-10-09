@@ -10,6 +10,8 @@ export type User = {
   city?: string;
   state?: string;
   property_size_ha?: number;
+  // AGR-22/AGR-23: conta de demonstração (único aviso no app é o DemoBanner).
+  demo?: boolean;
 };
 
 export type SignUpForm = {

@@ -5,13 +5,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { DateField } from '@/components/ui/DateField';
 import { Field } from '@/components/ui/Field';
 import { Select } from '@/components/ui/Select';
 import {
@@ -26,6 +26,7 @@ import {
   type PurchaseFilters,
 } from '@/lib/fiscal-api';
 import { brl, colors } from '@/lib/theme';
+import { formatDate, monthLabel } from '@/lib/format';
 
 const EMPTY_FILTERS: PurchaseFilters = {};
 const CATEGORY_OPTIONS = [
@@ -57,12 +58,11 @@ function Row({ label, sub, value }: { label: string; sub?: string; value: string
 export default function Relatorio() {
   const [draft, setDraft] = useState<PurchaseFilters>({});
   const [category, setCategory] = useState('');
-  const [demo, setDemo] = useState(false);
   const [applied, setApplied] = useState<PurchaseFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
 
-  const report = usePurchaseReport(applied, demo);
-  const list = usePurchaseItems(applied, page, demo);
+  const report = usePurchaseReport(applied);
+  const list = usePurchaseItems(applied, page);
 
   function apply() {
     setApplied({ ...draft, ...(category ? { category } : {}) });
@@ -70,7 +70,7 @@ export default function Relatorio() {
   }
 
   function reset() {
-    setDraft({});
+    setDraft({ date_from: '', date_to: '' });
     setCategory('');
     setApplied(EMPTY_FILTERS);
     setPage(1);
@@ -84,32 +84,22 @@ export default function Relatorio() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Relatório de compras</Text>
+        <Text style={styles.title}>Gastos detalhados</Text>
         <Text style={styles.sub}>
           Valor de compra em nota (vProd − vDesc) por data de emissão — não é pagamento, consumo
           nem economia de mercado.
         </Text>
 
-        <View style={styles.demoRow}>
-          <Text style={styles.demoText}>Dados de demonstração</Text>
-          <Switch value={demo} onValueChange={setDemo} accessibilityLabel="Dados de demonstração" />
-        </View>
-        {demo ? (
-          <Text style={styles.demoBadge}>Mostrando apenas registros de demonstração</Text>
-        ) : null}
-
         <Card>
-          <Field
-            label="Início (AAAA-MM-DD)"
+          <DateField
+            label="De"
             value={draft.date_from ?? ''}
-            onChangeText={(v) => setDraft((d) => ({ ...d, date_from: v }))}
-            placeholder="2026-01-01"
+            onChange={(iso) => setDraft((d) => ({ ...d, date_from: iso }))}
           />
-          <Field
-            label="Fim (AAAA-MM-DD)"
+          <DateField
+            label="Até"
             value={draft.date_to ?? ''}
-            onChangeText={(v) => setDraft((d) => ({ ...d, date_to: v }))}
-            placeholder="2026-12-31"
+            onChange={(iso) => setDraft((d) => ({ ...d, date_to: iso }))}
           />
           <Field
             label="Fornecedor"
@@ -157,7 +147,7 @@ export default function Relatorio() {
                 <Text style={styles.emptyText}>
                   Nenhuma compra encontrada. Envie XMLs em Notas fiscais ou ajuste os filtros.
                 </Text>
-                <Button title="Ir para Notas fiscais" variant="outline" onPress={() => router.push('/notas')} />
+                <Button title="Ir para Compras" variant="outline" onPress={() => router.push('/compras')} />
               </Card>
             ) : (
               <>
@@ -165,7 +155,7 @@ export default function Relatorio() {
                   {report.data.by_month.map((m) => (
                     <Row
                       key={m.month}
-                      label={m.month}
+                      label={monthLabel(m.month)}
                       sub={`${m.items_count} ${m.items_count === 1 ? 'item' : 'itens'}`}
                       value={brl(Number(m.total_value))}
                     />
@@ -219,19 +209,14 @@ export default function Relatorio() {
                         onPress={() =>
                           router.push({
                             pathname: '/notas/[id]',
-                            params: {
-                              id: String(item.fiscal_document_id),
-                              ...(demo ? { demo: 'true' } : {}),
-                            },
+                            params: { id: String(item.fiscal_document_id) },
                           })
                         }>
                         <Card style={styles.itemCard}>
                           <Text style={styles.itemDesc}>{item.description}</Text>
                           <Text style={styles.rowSub}>
                             {item.supplier_name ?? 'Emitente desconhecido'}
-                            {item.issued_at
-                              ? ` · ${new Date(item.issued_at).toLocaleDateString('pt-BR')}`
-                              : ''}
+                            {item.issued_at ? ` · ${formatDate(item.issued_at)}` : ''}
                           </Text>
                           <Text style={styles.rowSub}>
                             {brl(lineValue(item) ?? undefined)}
@@ -285,10 +270,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   container: { padding: 20, paddingBottom: 40, maxWidth: 520, width: '100%', alignSelf: 'center' },
   title: { fontSize: 24, fontWeight: '800', color: colors.text },
-  sub: { fontSize: 14, color: colors.muted, marginTop: 8, marginBottom: 12, lineHeight: 20 },
-  demoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  demoText: { fontSize: 14, fontWeight: '600', color: colors.text },
-  demoBadge: { fontSize: 13, fontWeight: '700', color: colors.primaryDark, marginBottom: 8 },
+  sub: { fontSize: 15, color: colors.muted, marginTop: 8, marginBottom: 12, lineHeight: 21 },
   filterBtns: { flexDirection: 'row', gap: 12, marginTop: 4 },
   filterHalf: { flex: 1 },
   errorCard: { marginTop: 16, gap: 12 },

@@ -68,22 +68,19 @@ export const INBOX_STATUSES = [
 ] as const;
 
 const INBOX_LABELS: Record<string, string> = {
-  needs_response: 'Responder',
-  awaiting_xml: 'Aguard. XML',
+  needs_response: 'Esperando você',
+  awaiting_xml: 'Buscando a nota completa',
   processing: 'Processando',
-  needs_review: 'Revisar',
-  processed: 'Processada',
+  needs_review: 'Classificar itens',
+  processed: 'Pronta',
   disputed: 'Contestada',
-  failed: 'Falhou',
+  failed: 'Com problema',
   cancelled: 'Cancelada',
 };
 
 export function inboxLabel(status: string): string {
   return INBOX_LABELS[status] ?? status;
 }
-
-// AGR-4 milestone wording for every simulated (demo) fiscal surface.
-export const SIMULATED_FISCAL_BANNER = 'Integração fiscal simulada — nenhuma operação enviada à SEFAZ';
 
 export type InboxFilters = {
   inbox_status?: string;
@@ -244,23 +241,21 @@ export function excludedStatusLabel(status: string): string {
   return EXCLUDED_STATUS_LABELS[status] ?? status;
 }
 
-export function useFiscalDocuments(demo = false) {
+export function useFiscalDocuments() {
   return useQuery({
-    queryKey: ['fiscal-documents', demo],
-    queryFn: async () =>
-      (await api.get<FiscalDocumentDTO[]>('/fiscal_documents', { params: demo ? { demo: 'true' } : {} }))
-        .data,
+    queryKey: ['fiscal-documents'],
+    queryFn: async () => (await api.get<FiscalDocumentDTO[]>('/fiscal_documents')).data,
   });
 }
 
 // AGR-5: inbox list with backend-derived status, per-status counts (from the
 // X-Inbox-Counts response header) and connection/sync status.
-export function useInboxDocuments(filters: InboxFilters, demo = false) {
+export function useInboxDocuments(filters: InboxFilters) {
   return useQuery({
-    queryKey: ['fiscal-inbox', filters, demo],
+    queryKey: ['fiscal-inbox', filters],
     queryFn: async () => {
       const res = await api.get<FiscalDocumentDTO[]>('/fiscal_documents', {
-        params: cleanParams({ ...filters, ...(demo ? { demo: 'true' } : {}) }),
+        params: cleanParams(filters),
       });
       let counts: Record<string, number> = {};
       const raw = res.headers['x-inbox-counts'];
@@ -282,15 +277,10 @@ export function useInboxDocuments(filters: InboxFilters, demo = false) {
   });
 }
 
-export function useFiscalIdentities(demo = false) {
+export function useFiscalIdentities() {
   return useQuery({
-    queryKey: ['fiscal-identities', demo],
-    queryFn: async () =>
-      (
-        await api.get<FiscalIdentityDTO[]>('/fiscal_identities', {
-          params: demo ? { demo: 'true' } : {},
-        })
-      ).data,
+    queryKey: ['fiscal-identities'],
+    queryFn: async () => (await api.get<FiscalIdentityDTO[]>('/fiscal_identities')).data,
   });
 }
 
@@ -301,56 +291,57 @@ export function useManifestDocument() {
       id,
       event_type,
       justification,
-      demo,
     }: {
       id: number;
       event_type: string;
       justification?: string;
-      demo?: boolean;
     }) =>
       (
         await api.post<{ manifestation: FiscalManifestationDTO; already_submitted: boolean; inbox_status: string }>(
           `/fiscal_documents/${id}/manifestations`,
           { event_type, justification },
-          { params: demo ? { demo: 'true' } : {} },
         )
       ).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fiscal-inbox'] });
       qc.invalidateQueries({ queryKey: ['fiscal-documents'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['price-comparisons'] });
     },
   });
 }
 
-export function useFiscalDocument(id?: string | number, demo = false) {
+export function useFiscalDocument(id?: string | number) {
   return useQuery({
-    queryKey: ['fiscal-documents', String(id), demo],
+    queryKey: ['fiscal-documents', String(id)],
     queryFn: async () =>
-      (await api.get<FiscalDocumentDetail>(`/fiscal_documents/${id}`, {
-        params: demo ? { demo: 'true' } : {},
-      })).data,
+      (await api.get<FiscalDocumentDetail>(`/fiscal_documents/${id}`)).data,
     enabled: id != null && id !== '',
   });
 }
 
-export function useReviewItems(demo = false) {
+// match_status do backend. O padrão é a fila do conferente; Compras também
+// inclui 'unmatched' para mostrar a descrição do primeiro item pendente. A API
+// aceita um status por requisição, então cada status vira uma chamada.
+export function useReviewItems(matchStatuses: string[] = ['needs_review']) {
   return useQuery({
-    queryKey: ['review-items', demo],
-    queryFn: async () =>
-      (
-        await api.get<FiscalItemDTO[]>('/fiscal_document_items', {
-          params: { match_status: 'needs_review', ...(demo ? { demo: 'true' } : {}) },
-        })
-      ).data,
+    queryKey: ['review-items', matchStatuses],
+    queryFn: async () => {
+      const responses = await Promise.all(
+        matchStatuses.map((status) =>
+          api.get<FiscalItemDTO[]>('/fiscal_document_items', { params: { match_status: status } }),
+        ),
+      );
+      return responses.flatMap((res) => res.data);
+    },
   });
 }
 
-export function useProductSearch(query: string, demo = false) {
+export function useProductSearch(query: string) {
   return useQuery({
-    queryKey: ['products', query, demo],
+    queryKey: ['products', query],
     queryFn: async () =>
-      (await api.get<ProductDTO[]>('/products', { params: { q: query, ...(demo ? { demo: 'true' } : {}) } }))
-        .data,
+      (await api.get<ProductDTO[]>('/products', { params: { q: query } })).data,
     enabled: query.trim().length >= 2,
   });
 }
@@ -358,13 +349,8 @@ export function useProductSearch(query: string, demo = false) {
 export function useUploadFiscalDocuments() {
   const qc = useQueryClient();
   return useMutation({
-    // demo: uploads join the demo set (never live aggregates).
-    mutationFn: async ({ form, demo = false }: { form: FormData; demo?: boolean }) =>
-      (
-        await api.post<{ results: UploadResult[] }>('/fiscal_documents', form, {
-          params: demo ? { demo: 'true' } : {},
-        })
-      ).data,
+    mutationFn: async ({ form }: { form: FormData }) =>
+      (await api.post<{ results: UploadResult[] }>('/fiscal_documents', form)).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fiscal-documents'] });
       qc.invalidateQueries({ queryKey: ['fiscal-inbox'] });
@@ -372,6 +358,8 @@ export function useUploadFiscalDocuments() {
       qc.invalidateQueries({ queryKey: ['review-items'] });
       qc.invalidateQueries({ queryKey: ['purchase-report'] });
       qc.invalidateQueries({ queryKey: ['purchase-items'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['price-comparisons'] });
     },
   });
 }
@@ -387,6 +375,8 @@ export function useCreateManualFiscalDocument() {
       qc.invalidateQueries({ queryKey: ['review-items'] });
       qc.invalidateQueries({ queryKey: ['purchase-report'] });
       qc.invalidateQueries({ queryKey: ['purchase-items'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['price-comparisons'] });
     },
   });
 }
@@ -399,6 +389,8 @@ export function useCorrectItem() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fiscal-documents'] });
       qc.invalidateQueries({ queryKey: ['review-items'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['price-comparisons'] });
     },
   });
 }
@@ -410,24 +402,24 @@ export function useCreateProduct() {
   });
 }
 
-export function usePurchaseReport(filters: PurchaseFilters, demo = false) {
+export function usePurchaseReport(filters: PurchaseFilters) {
   return useQuery({
-    queryKey: ['purchase-report', filters, demo],
+    queryKey: ['purchase-report', filters],
     queryFn: async () =>
       (
         await api.get<PurchaseReportDTO>('/purchase_report', {
-          params: cleanParams({ ...filters, ...(demo ? { demo: 'true' } : {}) }),
+          params: cleanParams(filters),
         })
       ).data,
   });
 }
 
-export function usePurchaseItems(filters: PurchaseFilters, page: number, demo = false) {
+export function usePurchaseItems(filters: PurchaseFilters, page: number) {
   return useQuery({
-    queryKey: ['purchase-items', filters, page, demo],
+    queryKey: ['purchase-items', filters, page],
     queryFn: async () => {
       const res = await api.get<FiscalItemDTO[]>('/fiscal_document_items', {
-        params: cleanParams({ ...filters, page, per_page: 20, ...(demo ? { demo: 'true' } : {}) }),
+        params: cleanParams({ ...filters, page, per_page: 20 }),
       });
       return { items: res.data, total: Number(res.headers['x-total-count'] ?? res.data.length) };
     },

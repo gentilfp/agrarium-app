@@ -31,11 +31,11 @@ export function Button({ title, onPress, loading, disabled, variant = 'primary' 
 }
 
 const styles = StyleSheet.create({
-  base: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  base: { minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   primary: { backgroundColor: colors.primary },
   outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.85 },
-  text: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  text: { color: colors.white, fontSize: 17, fontWeight: '700' },
   textOutline: { color: colors.primary },
 });

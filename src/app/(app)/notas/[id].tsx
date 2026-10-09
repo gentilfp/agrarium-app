@@ -16,30 +16,24 @@ import {
   apiError,
   inboxLabel,
   lineValue,
-  SIMULATED_FISCAL_BANNER,
   useFiscalDocument,
   useManifestDocument,
 } from '@/lib/fiscal-api';
+import { formatDate } from '@/lib/format';
 import { brl, colors } from '@/lib/theme';
 
+// AGR-23: linguagem simples. As duas respostas que o produtor usa todo dia vêm
+// primeiro; ciência e "operação não realizada" ficam em "Outro problema".
 const ACTIONS = [
   {
-    type: 'ciencia_operacao',
-    button: 'Dar ciência',
-    title: 'Ciência da operação',
-    explain:
-      'Você avisa que viu esta nota e libera a busca do XML completo. ' +
-      'Ciência NÃO é confirmação de compra — ela só diz “estou ciente”.',
-    needsJustification: false,
-  },
-  {
     type: 'confirmacao_operacao',
-    button: 'Reconheço esta compra',
+    button: 'Sim, comprei',
     title: 'Confirmação da operação',
     explain:
       'Você confirma que esta compra aconteceu. É registrada na SEFAZ como ' +
       'confirmação e não pode ser desfeita.',
     needsJustification: false,
+    primary: true,
   },
   {
     type: 'desconhecimento_operacao',
@@ -50,6 +44,7 @@ const ACTIONS = [
       'notas emitidas por engano em seu nome. É registrada na SEFAZ e não pode ' +
       'ser desfeita.',
     needsJustification: false,
+    primary: true,
   },
   {
     type: 'operacao_nao_realizada',
@@ -60,6 +55,17 @@ const ACTIONS = [
       'cancelado, mercadoria devolvida). É registrada na SEFAZ, não pode ser ' +
       'desfeita e exige uma justificativa de 15 a 255 caracteres.',
     needsJustification: true,
+    primary: false,
+  },
+  {
+    type: 'ciencia_operacao',
+    button: 'Só dar ciência (não é confirmação)',
+    title: 'Ciência da operação',
+    explain:
+      'Você avisa que viu esta nota e libera a busca da nota completa. ' +
+      'Ciência NÃO é confirmação de compra — ela só diz “estou ciente”.',
+    needsJustification: false,
+    primary: false,
   },
 ] as const;
 
@@ -78,9 +84,8 @@ const SETTLE_DELAYS_MS = [600, 1200, 2000, 3000, 4000];
 type ResultLine = { text: string; refusal: boolean };
 
 export default function NotaDetalhe() {
-  const { id, demo } = useLocalSearchParams<{ id: string; demo?: string }>();
-  const isDemoView = demo === 'true';
-  const { data: doc, isLoading, isError, error, refetch } = useFiscalDocument(id, isDemoView);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: doc, isLoading, isError, error, refetch } = useFiscalDocument(id);
   const manifest = useManifestDocument();
   const [active, setActive] = useState<(typeof ACTIONS)[number] | null>(null);
   const [justification, setJustification] = useState('');
@@ -127,7 +132,6 @@ export default function NotaDetalhe() {
         id: doc.id,
         event_type: active.type,
         justification: active.needsJustification ? justification : undefined,
-        demo: doc.is_demo,
       });
       const { status, id: manifestationId, error: refusalReason } = payload.manifestation;
       setResultIsDemo(doc.is_demo);
@@ -182,15 +186,9 @@ export default function NotaDetalhe() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>{doc.emitter_name ?? 'Documento'}</Text>
-        {doc.is_demo ? (
-          <>
-            <Text style={styles.demoBadge}>Dados de demonstração</Text>
-            <Text style={styles.demoBadge}>{SIMULATED_FISCAL_BANNER}</Text>
-          </>
-        ) : null}
         <Text style={styles.meta}>
           {isManual ? 'Lançamento manual' : `Chave ${doc.chave}`}
-          {doc.issued_at ? ` · Emitida em ${new Date(doc.issued_at).toLocaleDateString('pt-BR')}` : ''}
+          {doc.issued_at ? ` · Emitida em ${formatDate(doc.issued_at)}` : ''}
         </Text>
         <Text style={styles.meta}>
           {doc.nat_op ?? ''}
@@ -203,9 +201,9 @@ export default function NotaDetalhe() {
         </Text>
         <Text style={styles.statusLine}>
           Situação: {inboxLabel(doc.inbox_status)}
-          {!isManual ? ` · XML: ${xmlLabel(doc.xml_status)}` : ' · Compra informada sem XML'}
+          {!isManual ? ` · ${xmlLabel(doc.xml_status)}` : ' · Compra informada sem arquivo'}
           {doc.manifestation_deadline
-            ? ` · Prazo de resposta: ${new Date(doc.manifestation_deadline).toLocaleDateString('pt-BR')}${doc.deadline_soon ? ' (próximo!)' : ''}`
+            ? ` · Responda até ${formatDate(doc.manifestation_deadline)}${doc.deadline_soon ? ' (próximo!)' : ''}`
             : ''}
         </Text>
         {doc.sync_error ? <Text style={styles.errorText}>⚠ {doc.sync_error}</Text> : null}
@@ -248,7 +246,17 @@ export default function NotaDetalhe() {
                 Resposta simulada — não enviada à SEFAZ. Vale para testar o fluxo.
               </Text>
             ) : null}
-            {ACTIONS.map((a) => (
+            {ACTIONS.filter((a) => a.primary).map((a) => (
+              <View key={a.type} style={{ marginBottom: 8 }}>
+                <Button
+                  title={a.button}
+                  variant={a.type === 'confirmacao_operacao' ? 'primary' : 'outline'}
+                  onPress={() => setActive(a)}
+                />
+              </View>
+            ))}
+            <Text style={styles.h3}>Outro problema</Text>
+            {ACTIONS.filter((a) => !a.primary).map((a) => (
               <View key={a.type} style={{ marginBottom: 8 }}>
                 <Button title={a.button} variant="outline" onPress={() => setActive(a)} />
               </View>
@@ -295,14 +303,9 @@ export default function NotaDetalhe() {
         ))}
         {doc.needs_review_count > 0 ? (
           <Button
-            title="Revisar itens no conferente"
+            title="Classificar itens"
             variant="outline"
-            onPress={() =>
-              router.push({
-                pathname: '/revisao',
-                params: doc.is_demo ? { demo: 'true' } : {},
-              })
-            }
+            onPress={() => router.push('/revisao')}
           />
         ) : null}
 
@@ -346,10 +349,10 @@ export default function NotaDetalhe() {
 }
 
 function xmlLabel(status: string) {
-  if (status === 'retrieved') return 'XML recebido';
-  if (status === 'pending') return 'buscando XML';
-  if (status === 'failed') return 'falha no XML';
-  return 'XML indisponível';
+  if (status === 'retrieved') return 'nota completa recebida';
+  if (status === 'pending') return 'buscando a nota completa';
+  if (status === 'failed') return 'falha na nota completa';
+  return 'nota completa ainda não chegou';
 }
 
 // Backend refusal reasons are lower-case API messages.
@@ -364,9 +367,10 @@ const styles = StyleSheet.create({
   demoBadge: { fontSize: 13, fontWeight: '700', color: colors.primaryDark, marginTop: 4 },
   meta: { fontSize: 13, color: colors.muted, marginTop: 4, lineHeight: 18 },
   statusLine: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 8, lineHeight: 20 },
-  h2: { fontSize: 16, fontWeight: '800', color: colors.text, marginTop: 20, marginBottom: 10 },
-  itemDesc: { fontSize: 15, fontWeight: '700', color: colors.text },
-  itemMeta: { fontSize: 13, color: colors.muted, marginTop: 4, lineHeight: 18 },
+  h2: { fontSize: 17, fontWeight: '800', color: colors.text, marginTop: 20, marginBottom: 10 },
+  h3: { fontSize: 15, fontWeight: '800', color: colors.muted, marginTop: 16, marginBottom: 8 },
+  itemDesc: { fontSize: 16, fontWeight: '700', color: colors.text },
+  itemMeta: { fontSize: 14, color: colors.muted, marginTop: 4, lineHeight: 20 },
   errorCard: { marginTop: 24, gap: 12 },
   errorText: { fontSize: 14, color: colors.danger, lineHeight: 20 },
   okText: { fontSize: 14, color: colors.primaryDark, fontWeight: '700', marginTop: 8, lineHeight: 20 },

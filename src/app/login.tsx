@@ -31,7 +31,7 @@ export default function Login() {
     setErr(null);
     try {
       await signIn(data.email, data.password);
-      router.replace('/dashboard');
+      router.replace('/inicio');
     } catch (e) {
       setErr(apiError(e, 'Não foi possível entrar.'));
     } finally {

@@ -4,11 +4,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -41,7 +39,7 @@ function ReviewCard({ item }: { item: FiscalItemDTO }) {
   const [packageUnit, setPackageUnit] = useState('');
   const [creating, setCreating] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const { data: options } = useProductSearch(query, item.is_demo);
+  const { data: options } = useProductSearch(query);
 
   async function confirm() {
     setFeedback(null);
@@ -89,7 +87,6 @@ function ReviewCard({ item }: { item: FiscalItemDTO }) {
         Sugestão: {item.product ? item.product.name : 'nenhum produto'}
         {item.match_method && item.match_method !== 'none' ? ` (${item.match_method})` : ''}
       </Text>
-      {item.is_demo ? <Text style={styles.demoBadge}>Dados de demonstração</Text> : null}
 
       <Field label="Buscar produto" value={query} onChangeText={setQuery} placeholder="mín. 2 letras" />
       {options?.map((p) => (
@@ -157,22 +154,16 @@ function ReviewCard({ item }: { item: FiscalItemDTO }) {
 }
 
 export default function Revisao() {
-  const { demo: demoParam } = useLocalSearchParams<{ demo?: string }>();
-  const [demo, setDemo] = useState(demoParam === 'true');
-  const { data: items, isLoading, refetch } = useReviewItems(demo);
+  const { data: items, isLoading, refetch } = useReviewItems();
 
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Revisar compras</Text>
+        <Text style={styles.title}>Classificar compras</Text>
         <Text style={styles.sub}>
-          Itens que o classificador não reconheceu com segurança. Ao corrigir, o Agrarium aprende e
-          atualiza os iguais.
+          Itens que o Agrarium não reconheceu com segurança. Ao classificar, ele aprende e atualiza
+          os iguais.
         </Text>
-        <View style={styles.demoRow}>
-          <Text style={styles.demoText}>Dados de demonstração</Text>
-          <Switch value={demo} onValueChange={setDemo} accessibilityLabel="Dados de demonstração" />
-        </View>
         {isLoading ? (
           <ActivityIndicator color={colors.primary} />
         ) : items && items.length > 0 ? (
@@ -199,13 +190,10 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   container: { padding: 20, paddingBottom: 40, maxWidth: 520, width: '100%', alignSelf: 'center' },
   title: { fontSize: 24, fontWeight: '800', color: colors.text },
-  sub: { fontSize: 15, color: colors.muted, marginTop: 8, marginBottom: 16, lineHeight: 21 },
-  count: { fontSize: 14, fontWeight: '700', color: colors.muted, marginBottom: 10 },
-  itemDesc: { fontSize: 15, fontWeight: '700', color: colors.text },
-  itemMeta: { fontSize: 13, color: colors.muted, marginTop: 4, lineHeight: 18 },
-  demoBadge: { fontSize: 12, fontWeight: '700', color: colors.primaryDark, marginTop: 4 },
-  demoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  demoText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  sub: { fontSize: 16, color: colors.muted, marginTop: 8, marginBottom: 16, lineHeight: 22 },
+  count: { fontSize: 15, fontWeight: '700', color: colors.muted, marginBottom: 10 },
+  itemDesc: { fontSize: 16, fontWeight: '700', color: colors.text },
+  itemMeta: { fontSize: 14, color: colors.muted, marginTop: 4, lineHeight: 20 },
   option: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
   optionActive: { backgroundColor: colors.primaryLight },
   optionText: { fontSize: 15, color: colors.text },
@@ -214,5 +202,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12 },
   feedback: { marginTop: 8, fontSize: 14, color: colors.text },
   emptyCard: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  emptyText: { fontSize: 14, color: colors.primaryDark, lineHeight: 20 },
+  emptyText: { fontSize: 16, color: colors.primaryDark, lineHeight: 22 },
 });

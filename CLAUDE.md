@@ -32,33 +32,43 @@ npx tsc --noEmit                  # type-check
 npx expo export --platform web    # production-ish bundle (validation)
 ```
 Run the backend too so the app has an API: `cd ../agrarium-backend && bin/rails s` (port 3000).
-Demo login: `demo@agrarium.com.br` / `agrarium123`.
+Demo login: `demo-nfe@agrarium.com.br` / `agrarium123`.
 
 ## Structure (current)
 ```
 src/
 ├─ app/
 │  ├─ _layout.tsx          # providers: QueryClient + AuthProvider + Stack
-│  ├─ index.tsx            # redirect: signed in → /dashboard, else → /login
+│  ├─ index.tsx            # redirect: signed in → /inicio, else → /login
 │  ├─ login.tsx            # login (shows the logo)
 │  ├─ register.tsx         # sign up
 │  └─ (app)/
-│     ├─ _layout.tsx       # protected group (auth guard)
-│     ├─ dashboard.tsx     # list of analyzed safras (useHarvests) + links to notas/revisão
+│     ├─ _layout.tsx       # protected group (auth guard) + Stack for detail screens
+│     ├─ (tabs)/
+│     │  ├─ _layout.tsx    # AGR-23: 4 tabs — left menu ≥768px, bottom bar on phones
+│     │  ├─ inicio.tsx     # AGR-23: dashboard from GET /dashboard (totals, alerts, prices)
+│     │  ├─ compras.tsx    # AGR-23: invoices — "Sim, comprei" / "Não reconheço" + quick categories
+│     │  ├─ precos.tsx     # AGR-23: own price vs. market from GET /price_comparisons
+│     │  └─ safra.tsx      # list of analyzed safras (useHarvests)
+│     ├─ adicionar-compra.tsx # AGR-23: type the purchase or upload the XML
+│     ├─ nota-manual.tsx   # manual purchase form → POST /fiscal_documents/manual
 │     ├─ nova-safra.tsx    # safra wizard (dados + custos) → POST /harvests
 │     ├─ resultado.tsx     # server report (useHarvest)
-│     ├─ notas.tsx          # AGR-5: fiscal inbox (status filter + counts + sync + upload)
-│     ├─ notas/[id].tsx     # AGR-5: detail with manifestation timeline + response modals
-│     └─ revisao.tsx        # AGR-6: review queue (product search/create + correction)
+│     ├─ notas/[id].tsx    # AGR-5: detail with manifestation timeline + response modals
+│     ├─ relatorio.tsx     # AGR-7: "Gastos detalhados" (purchase report)
+│     └─ revisao.tsx       # AGR-6: "Classificar compras" (review queue)
 ├─ lib/
 │  ├─ api.ts               # axios + Bearer-token interceptor (EXPO_PUBLIC_API_URL)
 │  ├─ fiscal-api.ts         # AGR-6: fiscal DTOs + React Query hooks (upload, review, correct)
-│  ├─ auth.tsx             # AuthContext (signIn/signUp/signOut, /me on boot)
+│  ├─ dashboard-api.ts      # AGR-23: dashboard/price DTOs + hooks + priceBadge
+│  ├─ format.ts            # AGR-23: formatDate (DD/MM/AAAA) + monthLabel (mar/2026)
+│  ├─ auth.tsx             # AuthContext (signIn/signUp/signOut, /me on boot, User.demo)
 │  ├─ harvest.ts           # form taxonomy + display helpers (NO calc — backend owns it)
 │  ├─ harvests-api.ts      # React Query hooks + API DTO types
 │  ├─ storage.ts           # cross-platform token: SecureStore (native) / localStorage (web)
 │  └─ theme.ts             # Agrarium colors + helpers
-├─ components/             # Stepper, BarRow, MetricCard, CostChart, ui/ (Button, Field, Card, Select)
+├─ components/             # Stepper, BarRow, MetricCard, CostChart, DemoBanner,
+│                          # ui/ (Button, Field, DateField, Card, Select)
 └─ assets/images/logo.png  # Agrarium logo (used on login)
 ```
 
@@ -70,7 +80,8 @@ src/
 - **Check the versioned Expo docs before writing Expo code** (see `AGENTS.md`).
 - Everything must run on **web + native**: `expo-secure-store` doesn't work on web → use
   `lib/storage.ts`. Avoid `Alert.alert` (use on-screen error state instead).
-- Route groups `(app)` don't appear in the URL: navigate to `/dashboard`, `/login`, etc.
+- Route groups `(app)` and `(tabs)` don't appear in the URL: navigate to `/inicio`, `/compras`, `/login`, etc.
+- The app opens on `/inicio`. `/dashboard` no longer exists (AGR-23 moved the harvest list to `/safra`).
 - **Expo Go vs SDK**: this project is on a very new SDK; Expo Go on the store may not match
   it ("requires a newer version of Expo Go"). For device testing use a **development build**
   (`npx expo run:ios` / `run:android`), not Expo Go. Web is unaffected.

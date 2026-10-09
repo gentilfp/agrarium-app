@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { DateField } from '@/components/ui/DateField';
 import { Field } from '@/components/ui/Field';
 import { Select } from '@/components/ui/Select';
 import {
@@ -78,7 +79,7 @@ export default function NotaManual() {
   function validate() {
     const next: Errors = {};
     if (!supplierName.trim()) next.supplierName = 'Informe o nome do fornecedor.';
-    if (!validDate(issuedAt)) next.issuedAt = 'Use uma data válida no formato AAAA-MM-DD.';
+    if (!validDate(issuedAt)) next.issuedAt = 'Informe a data de emissão.';
 
     const documentDigits = supplierDocument.replace(/\D/g, '');
     if (supplierDocument.trim() && documentDigits.length !== 11 && documentDigits.length !== 14) {
@@ -127,10 +128,10 @@ export default function NotaManual() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets>
-        <Text style={styles.title}>Adicionar compra</Text>
+        <Text style={styles.title}>Digitar a compra</Text>
         <Text style={styles.sub}>
-          Preencha os dados da nota quando você não tiver o XML. Os valores serão incluídos no
-          relatório de compras.
+          Preencha os dados da nota quando você não tiver o arquivo. Os valores entram nos seus
+          gastos.
         </Text>
 
         <Card>
@@ -151,13 +152,10 @@ export default function NotaManual() {
             keyboardType="numeric"
             error={errors.supplierDocument}
           />
-          <Field
+          <DateField
             label="Data de emissão"
-            hint="Formato: AAAA-MM-DD"
             value={issuedAt}
-            onChangeText={setIssuedAt}
-            placeholder="2026-03-10"
-            autoCapitalize="none"
+            onChange={setIssuedAt}
             error={errors.issuedAt}
           />
         </Card>
@@ -242,8 +240,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   container: { padding: 20, paddingBottom: 40, maxWidth: 520, width: '100%', alignSelf: 'center' },
   title: { fontSize: 24, fontWeight: '800', color: colors.text },
-  sub: { fontSize: 15, color: colors.muted, marginTop: 8, marginBottom: 16, lineHeight: 21 },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.text, marginBottom: 10 },
+  sub: { fontSize: 16, color: colors.muted, marginTop: 8, marginBottom: 16, lineHeight: 22 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 10 },
   cardTitle: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 14 },
   itemHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   remove: { color: colors.danger, fontSize: 14, fontWeight: '700', marginBottom: 14 },

@@ -321,7 +321,7 @@ export default function Resultado() {
       <View style={styles.actions}>
         <Button title="Lançar outra safra" onPress={() => router.replace('/nova-safra')} />
         <View style={{ height: 10 }} />
-        <Button title="Voltar ao painel" variant="outline" onPress={() => router.replace('/dashboard')} />
+        <Button title="Voltar para a safra" variant="outline" onPress={() => router.replace('/safra')} />
       </View>
     </ScrollView>
   );

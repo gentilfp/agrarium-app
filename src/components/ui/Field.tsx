@@ -20,8 +20,8 @@ export function Field({ label, hint, error, style, ...rest }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 4 },
-  hint: { fontSize: 12, color: colors.muted, marginBottom: 6 },
+  label: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 4 },
+  hint: { fontSize: 13, color: colors.muted, marginBottom: 6 },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -29,9 +29,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
+    minHeight: 48,
+    fontSize: 17,
     color: colors.text,
   },
   inputError: { borderColor: colors.danger },
-  error: { color: colors.danger, fontSize: 12, marginTop: 4 },
+  error: { color: colors.danger, fontSize: 13, marginTop: 4 },
 });
